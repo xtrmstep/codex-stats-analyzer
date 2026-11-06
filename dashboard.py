@@ -11,11 +11,14 @@ from agents import analyze_agents
 from analytics import calculate_increments
 from metrics import Filters, build_dataset, filter_dataset, grouped, summarize, time_buckets
 from parser import ingest
-from annotations import MetadataStore, StorageError
+from annotations import MetadataStore, StorageError, missing_sessions
 from labels_ui import manage
 from labels import assigned, matches, run_labels
 from run_ui import manage_runs, select_runs, run_summary
 from experiment_ui import render_experiments
+from exports import csv_bytes, SESSION_COLUMNS, RUN_COLUMNS
+from refresh import source_manifest, changes
+from runs import calculate_run
 
 
 def _display(total, suffix=""):
@@ -39,6 +42,15 @@ def _chart_rows(groups):
 
 def render(sources):
     """Render the overview and selected session from local read-only sources."""
+    refresh_requested = st.sidebar.button("Refresh sources")
+    manifest_key = "source_manifest"
+    if refresh_requested or manifest_key not in st.session_state:
+        manifest, fingerprint_diagnostics = source_manifest(sources)
+        previous = st.session_state.get(manifest_key)
+        if refresh_requested and previous is not None:
+            st.session_state["source_changes"] = changes(previous, manifest)
+        st.session_state[manifest_key] = manifest
+        st.session_state["fingerprint_diagnostics"] = fingerprint_diagnostics
     parsed = ingest(sources)
     accounting = calculate_increments(parsed.events)
     frame = build_dataset(parsed.events, accounting.increments)
@@ -51,6 +63,26 @@ def render(sources):
     if snapshot is not None:
         manage(store, snapshot, sorted(frame["session"].dropna().unique().tolist()))
         manage_runs(store, snapshot, parsed.events, accounting.increments)
+    if refresh_requested:
+        report = st.session_state.get("source_changes", {"new": [], "changed": [], "missing": []})
+        st.info(f"Refresh: {len(report['new'])} new, {len(report['changed'])} changed, {len(report['missing'])} unavailable or moved source files. All analytics and saved comparisons are recalculated.")
+        with st.expander("Source changes"):
+            for kind, paths in report.items():
+                for path in paths:
+                    st.write(f"{kind}: {path}")
+        for diagnostic in st.session_state.get("fingerprint_diagnostics", []):
+            st.warning(str(diagnostic))
+    if snapshot is not None:
+        missing = missing_sessions(snapshot, {event.session_id for event in parsed.events})
+        if missing:
+            st.warning("Annotations reference unavailable sessions: " + ", ".join(sorted(missing)))
+        unresolved = [(run["name"], issue) for run in snapshot.data["runs"]
+                      for issue in calculate_run(run, parsed.events, accounting.increments).diagnostics
+                      if "missing" in issue.lower() or "unavailable" in issue.lower() or "outside observed" in issue.lower()]
+        if unresolved:
+            with st.expander("Unavailable run references"):
+                for name, issue in unresolved:
+                    st.write(f"{name}: {issue}")
     st.sidebar.header("Filters")
     st.sidebar.caption("Manual filters select matching session usage and matching run intervals. Run boundaries are estimated; overlapping runs are counted once globally.")
     use_dates = st.sidebar.checkbox("Filter dates (UTC)")
@@ -171,12 +203,22 @@ def render(sources):
             st.info("Token components are unknown.")
         st.subheader("Runs")
         st.dataframe(pd.DataFrame(run_rows), hide_index=True, use_container_width=True)
+        st.download_button("Download filtered runs CSV", csv_bytes(run_rows, RUN_COLUMNS), file_name="runs.csv", mime="text/csv")
         st.subheader("Sessions")
         sessions = grouped(selected, parsed.events, "session")
-        st.dataframe(pd.DataFrame([{"Session": key, "Tokens": value.totals["total_tokens"].value,
-                                    "Input": value.totals["input_tokens"].value, "Output": value.totals["output_tokens"].value,
-                                    "Coverage": "Complete" if value.totals["total_tokens"].complete else "Partial or unknown",
-                                    "Agents": value.agents} for key, value in sessions]), hide_index=True, use_container_width=True)
+        session_rows = []
+        for key, value in sessions:
+            times = selected.loc[selected["session"] == key, "timestamp"].dropna()
+            session_rows.append({"Session": key, "Tokens": value.totals["total_tokens"].value,
+                                 "Input": value.totals["input_tokens"].value, "Output": value.totals["output_tokens"].value,
+                                 "Coverage": "Complete" if value.totals["total_tokens"].complete else "Partial or unknown",
+                                 "Provenance": "; ".join(value.provenance),
+                                 "Agents": value.agents,
+                                 "First observed UTC": times.min().isoformat() if not times.empty else None,
+                                 "Last observed UTC": times.max().isoformat() if not times.empty else None})
+        st.dataframe(pd.DataFrame(session_rows), hide_index=True, use_container_width=True)
+        st.download_button("Download filtered sessions CSV", csv_bytes(session_rows, SESSION_COLUMNS), file_name="sessions.csv", mime="text/csv")
+        st.caption("CSV uses UTF-8 with BOM, UTC ISO 8601 timestamps, blank unknown values and token/second units indicated in the column names.")
         session_ids = sorted(selected["session"].dropna().unique().tolist())
         if session_ids:
             root = st.selectbox("Session detail", session_ids)
@@ -263,6 +305,8 @@ def details(root, selected, events, increments, date_filter_active=False):
         with st.expander("Hierarchy limitations"):
             for item in hierarchy.diagnostics:
                 st.write(item)
+
+
 
 
 

@@ -12,6 +12,7 @@ import streamlit as st
 from annotations import MetadataStore, StorageError
 from experiment_store import FILTER_FIELDS, METRICS, groups_from_definition, record_snapshot, upsert_experiment
 from experiments import compare_groups
+from exports import csv_bytes, COMPARISON_COLUMNS
 
 
 def _serialize_filters(selection, agent, runs):
@@ -103,11 +104,13 @@ def render_experiments(data, events, increments, frame, selection, selected_agen
             for metric in metrics:
                 measure = group.measures[metric]
                 diff = comparison.differences.get(group.name, {}).get(metric)
-                table.append({"Group": group.name, "Runs": len(group.run_ids), "Metric": metric, "Value": measure.value,
+                table.append({"Group": group.name, "Runs": len(group.run_ids), "Metric": metric, "Unit": ("tokens" if metric in ("mean_tokens", "median_tokens", "output_tokens") else "seconds" if metric == "elapsed_seconds" else "score" if metric == "evaluation_score" else "percent"), "Value": measure.value,
                               "Eligible": measure.eligible, "Total": measure.total, "Provenance": measure.provenance,
                               "Difference from baseline": diff.absolute if diff else None,
                               "Difference %": diff.percentage if diff else None})
         st.dataframe(pd.DataFrame(table), hide_index=True, use_container_width=True)
+        st.download_button("Download comparison CSV", csv_bytes(table, COMPARISON_COLUMNS), file_name="comparison.csv", mime="text/csv")
+        st.caption("CSV metric units follow the metric name: tokens, seconds, percent, or score; unknown values are blank. Provenance and eligible counts are included.")
         for metric in metrics:
             chart = pd.DataFrame([row for row in table if row["Metric"] == metric])
             if not chart.empty and chart["Value"].notna().any():
@@ -144,6 +147,8 @@ def render_experiments(data, events, increments, frame, selection, selected_agen
                 if not filtered.empty and filtered["Value"].notna().any():
                     st.plotly_chart(px.line(filtered, x="Recorded at", y="Value", color="Group", markers=True, hover_data=["Eligible", "Runs"], title="Recorded calculation history"), use_container_width=True)
                 st.caption("Recorded points may use different global filters; inspect the saved snapshot context before comparing them.")
+
+
 
 
 
