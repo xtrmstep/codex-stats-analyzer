@@ -1,10 +1,12 @@
 # 13 — Consistent refresh and CSV export
 
-Status: Implementation complete; independent review pending | Phase: 3 | Dependencies: 06, 10, 12
+Status: Complete; independent review passed | Phase: 3 | Dependencies: 06, 10, 12
 
 Specification: §§3.1, 6.3, 7.4; MVP 10, 11.
 
 ## Scope
+
+Review: independent Astra re-review passed at `180c33d`, including committed run attribution in display and CSV. Browser downloads remain for task 14.
 
 - Add explicit refresh for new, appended, archived, changed and unavailable source files without a background service.
 - Invalidate derived caches consistently and preserve labels, run references and saved comparison definitions.
