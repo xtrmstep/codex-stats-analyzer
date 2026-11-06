@@ -1,10 +1,12 @@
 # 09 — Run definitions and interval metrics
 
-Status: Implementation complete; independent review pending | Phase: 2 | Dependencies: 03, 04, 07
+Status: Complete; independent review passed | Phase: 2 | Dependencies: 03, 04, 07
 
 Specification: §§2.3, 5.2–5.3; MVP 5, 6, 13.
 
 ## Scope
+
+Review: independent Astra review passed at `ec6eeb5`, including equal-time boundaries, overlapping runs, and missing references. Task 10 must visibly identify root-thread-only attribution.
 
 - Model multiple runs per session using whole-session, timestamp-boundary and stable event-boundary selection.
 - Store name, description, labels, task identifier, task type, outcome (success/failure/partial/unknown), optional evaluation score and notes.
