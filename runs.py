@@ -77,6 +77,7 @@ class RunResult:
     elapsed_provenance: str
     attribution: str
     diagnostics: tuple[str, ...]
+    event_references: tuple[str, ...]
 
 
 def calculate_run(run: dict, events: list[Event], increments: list[Increment]) -> RunResult:
@@ -94,6 +95,7 @@ def calculate_run(run: dict, events: list[Event], increments: list[Increment]) -
     kind = boundary["type"]
     diagnostics = []
     selected = []
+    selected_events = []
     elapsed = None
     provenance = "unknown"
     times = [_time(event.timestamp) for event in source_events]
@@ -104,6 +106,7 @@ def calculate_run(run: dict, events: list[Event], increments: list[Increment]) -
         diagnostics.append("Source session is unavailable; run usage is unknown.")
     elif kind == "whole_session":
         selected = source_increments
+        selected_events = source_events
         if len(observed) >= 2:
             elapsed = (max(observed) - min(observed)).total_seconds()
             provenance = "observed first-to-last activity span; not verified execution duration"
@@ -113,6 +116,7 @@ def calculate_run(run: dict, events: list[Event], increments: list[Increment]) -
             diagnostics.append("Timestamp boundary is outside observed session activity or timestamps are unavailable.")
         else:
             selected = [item for item in source_increments if _time(item.timestamp) is not None and start <= _time(item.timestamp) < end]
+            selected_events = [event for event in source_events if _time(event.timestamp) is not None and start <= _time(event.timestamp) < end]
             if any(_time(item.timestamp) is None for item in source_increments):
                 diagnostics.append("Untimestamped increments cannot be attributed to the interval.")
             elapsed = (end - start).total_seconds()
@@ -125,7 +129,8 @@ def calculate_run(run: dict, events: list[Event], increments: list[Increment]) -
         elif first >= last:
             diagnostics.append("Event boundaries must be in source order with start before end.")
         else:
-            refs = {event.reference for event in source_events[first:last]}
+            selected_events = source_events[first:last]
+            refs = {event.reference for event in selected_events}
             selected = [item for item in source_increments if item.reference in refs]
             if any(item.reference not in indices for item in source_increments):
                 diagnostics.append("Some increments have no source event and cannot be attributed.")
@@ -139,7 +144,7 @@ def calculate_run(run: dict, events: list[Event], increments: list[Increment]) -
         totals = {key: Total(value.value, False) for key, value in totals.items()}
     return RunResult(tuple(selected), totals, elapsed, provenance,
                      "observed counters" if kind == "whole_session" else "estimated from counter observation boundaries",
-                     tuple(diagnostics))
+                     tuple(diagnostics), tuple(event.reference for event in selected_events))
 
 
 def union_increments(results: list[RunResult]) -> tuple[Increment, ...]:
@@ -149,4 +154,5 @@ def union_increments(results: list[RunResult]) -> tuple[Increment, ...]:
         for increment in result.increments:
             unique.setdefault(increment.reference, increment)
     return tuple(unique.values())
+
 

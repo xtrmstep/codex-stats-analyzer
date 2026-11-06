@@ -23,15 +23,13 @@ def select_runs(data, events, increments, selection, base):
         if selection.sessions is not None and run["session_id"] not in selection.sessions:
             continue
         result = calculate_run(run, events, increments)
-        refs = {item.reference for item in result.increments}
+        refs = set(result.event_references) | {item.reference for item in result.increments}
         subset = base.loc[(base["session"] == run["session_id"]) & base["reference"].isin(refs)].copy()
         if not subset.empty:
             subset.attrs["manual_filter"] = True
             subset.attrs["run_filter"] = True
             matches_list.append((run, result, subset))
-        elif not refs and run["session_id"] in set(base["session"]):
-            subset.attrs["run_filter"] = True
-            matches_list.append((run, result, subset))
+
     return matches_list
 
 
@@ -123,6 +121,7 @@ def manage_runs(store, snapshot, events, increments):
                 st.rerun()
             except (ValueError, StorageError) as exc:
                 st.error(str(exc))
+
 
 
 
