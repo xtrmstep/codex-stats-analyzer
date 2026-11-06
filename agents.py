@@ -161,7 +161,16 @@ def analyze_agents(root_id: str, events: list[Event], increments: list[Increment
     main = agents[root_id].tokens if root_id in agents else Total(None, False)
     child_ids = set(depths) - {root_id}
     child_increments = [i for i in increments if i.session_id in child_ids]
-    sub = aggregate(child_increments)["total_tokens"] if child_ids else Total(None, False)
+    nested_streams = any(
+        agents[child].parent_id in child_ids
+        and any(i.session_id == child for i in child_increments)
+        and any(i.session_id == agents[child].parent_id for i in child_increments)
+        for child in child_ids
+    )
+    sub = (Total(None, False) if nested_streams else
+           aggregate(child_increments)["total_tokens"] if child_ids else Total(None, False))
+    if nested_streams:
+        diagnostics.append("Nested agent counter scopes may overlap; combined subagent tokens are unknown.")
     if child_ids and (any(not any(i.session_id == child for i in child_increments) for child in child_ids)):
         sub = Total(sub.value, False)
     # Parent counters may already include child counters, so a combined share
@@ -169,3 +178,4 @@ def analyze_agents(root_id: str, events: list[Event], increments: list[Increment
     share = Total(None, False)
     return AgentAnalysis(agents, children, unlinked, len(depths), max(depths.values()) if depths else None,
                          main, sub, share, skills, diagnostics)
+
