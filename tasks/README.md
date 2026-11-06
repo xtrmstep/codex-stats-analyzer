@@ -2,7 +2,7 @@
 
 Source of truth: [Codex Usage Analyzer specification](../specification/codex-usage-analyzer.md), preserved as supplied on 2026-11-06.
 
-Progress: Tasks 01–13 are implemented and independently reviewed; Task 14 is active. Review commit references are recorded in each task file. Interactive browser/offline asset validation remains for task 14. Task numbers give the recommended execution order. Dependencies are prerequisites, and each task includes concrete completion checks.
+Progress: Tasks 01–13 are implemented and independently reviewed. Task 14 documentation and code review passed at `3f503ea`; release acceptance remains partially verified. Browser editing, exports, filtering and restart persistence passed on synthetic data with the Python app process restricted to loopback. Browser-level offline operation, fresh offline launch from the space-containing path and broader boundary/hierarchy/filter interactions remain outstanding. Review commit references and validation evidence are recorded in each task file. Task numbers give the recommended execution order. Dependencies are prerequisites, and each task includes concrete completion checks.
 
 Execution override: the user authorized local-only Git work while no remote is available. Each task branch builds on the preceding reviewed task; remote discovery and pushes are deferred.
 

@@ -1,6 +1,6 @@
 # 14 — Windows offline acceptance and documentation
 
-Status: Partially verified; offline acceptance and independent review pending | Phase: 3 | Dependencies: 01–13
+Status: Partially verified; independent code/documentation review passed; remaining release acceptance pending | Phase: 3 | Dependencies: 01–13
 
 Specification: §§1, 8–11; all MVP acceptance criteria.
 
@@ -21,6 +21,8 @@ Specification: §§1, 8–11; all MVP acceptance criteria.
 - No known accounting, persistence or source-integrity failures remain; document actual unsupported source variants and remaining limitations.
 
 ## Integrated validation evidence
+
+- Independent Astra final review at `3f503ea` found no remaining code blockers in the reviewed changes and confirmed that documentation qualifies validation accurately. Task 14 is not marked complete: browser-level offline operation, a fresh offline launch from the path containing spaces, broader hierarchy interactions and remaining boundary/filter combinations are outstanding.
 
 - Python 3.12 compiled all application modules. Inline synthetic checks exercised discovery, counter deltas, explicit hierarchy, label/run persistence and inheritance, run overlap deduplication, shared filtering, saved comparison reload/recalculation, Unicode CSV quoting and source hash/mtime preservation. The checks created no permanent test files.
 - A 100-file synthetic collection with 10,000 events and 9,900 increments produced 19,900 analytics rows in 0.596 seconds for ingestion, accounting and frame construction on this machine. This is a smoke check, not a performance guarantee.
