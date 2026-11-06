@@ -1,10 +1,12 @@
 # 08 — Labels, bulk assignment and classification filters
 
-Status: Implementation complete; independent review pending | Phase: 2 | Dependencies: 05, 07
+Status: Complete; independent review passed | Phase: 2 | Dependencies: 05, 07
 
 Specification: §§2.4, 5.1, 6.1; MVP 5, 7, 9.
 
 ## Scope
+
+Review: independent Astra re-review passed at `3975d64`, including malformed structured-field rejection and legacy compatibility.
 
 - Support arbitrary free-form tags and structured key/value labels, including the example execution mode, skills, workflow, task type, configuration and result categories.
 - Create, edit and delete labels; assign multiple labels to sessions and runs, including bulk assignment to selected records.
