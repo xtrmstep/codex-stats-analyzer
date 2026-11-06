@@ -125,6 +125,8 @@ class MetadataStore:
         _validate(data, self.kind)
         temporary: str | None = None
         lock_fd: int | None = None
+        error: StorageError | None = None
+        result: Snapshot | None = None
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             try:
@@ -142,28 +144,44 @@ class MetadataStore:
                 os.fsync(file.fileno())
             os.replace(temporary, self.path)
             temporary = None
-            return Snapshot(json.loads(encoded), hashlib.sha256(encoded).hexdigest())
-        except StorageError:
-            raise
+            result = Snapshot(json.loads(encoded), hashlib.sha256(encoded).hexdigest())
+        except StorageError as exc:
+            error = exc
         except OSError as exc:
-            raise StorageError(f"Cannot save {self.path}; previous metadata was preserved: {exc}") from exc
-        finally:
-            if temporary is not None:
-                try:
-                    os.unlink(temporary)
-                except FileNotFoundError:
-                    pass
-            if lock_fd is not None:
+            error = StorageError(f"Cannot save {self.path}; previous metadata was preserved: {exc}")
+        cleanup_errors = []
+        if temporary is not None:
+            try:
+                os.unlink(temporary)
+            except FileNotFoundError:
+                pass
+            except OSError as exc:
+                cleanup_errors.append(f"temporary file {temporary}: {exc}")
+        if lock_fd is not None:
+            try:
                 os.close(lock_fd)
-                try:
-                    os.unlink(self.lock_path)
-                except FileNotFoundError:
-                    pass
-
+            except OSError as exc:
+                cleanup_errors.append(f"lock handle {self.lock_path}: {exc}")
+            try:
+                os.unlink(self.lock_path)
+            except FileNotFoundError:
+                pass
+            except OSError as exc:
+                cleanup_errors.append(f"lock file {self.lock_path}: {exc}")
+        if cleanup_errors:
+            message = "; ".join(cleanup_errors)
+            if error is not None:
+                error.args = (f"{error} Cleanup also failed: {message}",)
+            else:
+                error = StorageError(f"Metadata was saved, but cleanup failed: {message}")
+        if error is not None:
+            raise error
+        return result
 
 def missing_sessions(snapshot: Snapshot, available_session_ids: set[str]) -> set[str]:
     """Report referenced source sessions absent from the current discovery pass."""
     references = {run["session_id"] for run in snapshot.data.get("runs", [])}
     references.update(item["target_id"] for item in snapshot.data.get("assignments", []) if item["target_type"] == "session")
     return references - available_session_ids
+
 
