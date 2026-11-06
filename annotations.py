@@ -50,6 +50,12 @@ def _validate(data: Any, kind: str) -> None:
             if not _text(item.get("name")):
                 raise StorageError(f"Each {name} entry needs a non-empty name.")
     if kind == "annotations":
+        for label in data["labels"]:
+            key = label.get("key", "")
+            value = label.get("value", "")
+            if (not isinstance(key, str) or not isinstance(value, str)
+                    or bool(key.strip()) != bool(value.strip())):
+                raise StorageError("Label key and value must both be non-empty strings or both omitted/empty.")
         label_ids = {item["id"] for item in data["labels"]}
         for assignment in data["assignments"]:
             labels = assignment.get("label_ids")
@@ -183,5 +189,6 @@ def missing_sessions(snapshot: Snapshot, available_session_ids: set[str]) -> set
     references = {run["session_id"] for run in snapshot.data.get("runs", [])}
     references.update(item["target_id"] for item in snapshot.data.get("assignments", []) if item["target_type"] == "session")
     return references - available_session_ids
+
 
 
