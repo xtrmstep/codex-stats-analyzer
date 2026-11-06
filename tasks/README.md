@@ -2,7 +2,7 @@
 
 Source of truth: [Codex Usage Analyzer specification](../specification/codex-usage-analyzer.md), preserved as supplied on 2026-11-06.
 
-Progress: Tasks 01–09 are implemented and independently reviewed; Task 10 is active; Tasks 11–14 are not started. Review commit references are recorded in each task file. Interactive browser/offline asset validation remains for task 14. Task numbers give the recommended execution order. Dependencies are prerequisites, and each task includes concrete completion checks.
+Progress: Tasks 01–10 are implemented and independently reviewed; Task 11 is active; Tasks 12–14 are not started. Review commit references are recorded in each task file. Interactive browser/offline asset validation remains for task 14. Task numbers give the recommended execution order. Dependencies are prerequisites, and each task includes concrete completion checks.
 
 Execution override: the user authorized local-only Git work while no remote is available. Each task branch builds on the preceding reviewed task; remote discovery and pushes are deferred.
 

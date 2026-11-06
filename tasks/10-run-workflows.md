@@ -1,10 +1,12 @@
 # 10 — Run creation UI and complete dashboard integration
 
-Status: Implementation complete; independent review pending | Phase: 2 | Dependencies: 06, 08, 09
+Status: Complete; independent review passed | Phase: 2 | Dependencies: 06, 08, 09
 
 Specification: §§5, 6; MVP 5–7, 9, 13.
 
 ## Scope
+
+Review: independent Astra re-review passed at `7f4930e`; metadata-only run membership, filtered counts and unknown tokens verified.
 
 - Add run creation from a selected session, accepting an entire session, timestamps, or start/end events from the timeline.
 - Provide run editing/deletion, metadata forms, notes, outcome and optional evaluation score, with validation and clear save feedback.
