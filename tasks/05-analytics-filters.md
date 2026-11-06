@@ -1,10 +1,12 @@
 # 05 — Shared analytics and global filter contract
 
-Status: Implementation complete; independent review pending | Phase: 1 | Dependencies: 03, 04
+Status: Complete; independent review passed | Phase: 1 | Dependencies: 03, 04
 
 Specification: §§3.3, 6.1–6.3.
 
 ## Scope
+
+Review: independent Astra re-review passed at `357acd8`; observed-entity counting and unknown/partial usage checks passed.
 
 - Build reusable pandas analytics over normalized increments; keep metric logic independent of Streamlit rendering.
 - Support date, project, model, session and agent-role filters now, with a defined integration path for labels, task type and execution mode in Phase 2.
