@@ -1,10 +1,12 @@
 # 11 — Experiment groups and comparison metrics
 
-Status: Implementation complete; independent review pending | Phase: 3 | Dependencies: 05, 08, 09
+Status: Complete; independent review passed | Phase: 3 | Dependencies: 05, 08, 09
 
 Specification: §§2.5, 7.1–7.3; MVP 8, 13.
 
 ## Scope
+
+Review: independent Astra review passed at `99c2c76`, including eligibility, cache ratios, overlaps, outcomes and baseline differences.
 
 - Define two or more named groups through reusable run filters and labels. Specify interaction with global filters and flag runs shared across groups.
 - Compute sample size, mean/median tokens, cache percentage, output tokens, subagent share, elapsed time, success rate and optional evaluation score.
