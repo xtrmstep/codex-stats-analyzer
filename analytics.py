@@ -80,10 +80,13 @@ def calculate_increments(events: list[Event]) -> AccountingResult:
         previous_time = None
         current_model = None
         previous_model = None
+        model_changed = False
         seen: set[str] = set()
         first = True
         for event in session_events:
             if event.model:
+                if current_model is not None and event.model != current_model:
+                    model_changed = True
                 current_model = event.model
             counters = _counter(event, family)
             if counters is None or event.reference in seen:
@@ -142,12 +145,13 @@ def calculate_increments(events: list[Event]) -> AccountingResult:
                     result.diagnostics.append(f"{event.reference}: cached input increment exceeds input increment.")
                     values["cached_input_tokens"] = None
                     valid = False
-            model = current_model if not first and current_model == previous_model else None
-            if not first and current_model != previous_model:
+            model = current_model if not first and not model_changed and current_model == previous_model else None
+            if not first and (model_changed or current_model != previous_model):
                 result.diagnostics.append(f"{event.reference}: model changed between counters; increment model is unknown.")
             result.increments.append(Increment(event.reference, session, event.agent_id or session, event.parent_agent_id, model, event.timestamp, values, valid and not first and not reset and all(v is not None for v in values.values())))
             previous = raw
             previous_model = current_model
+            model_changed = False
             previous_time = observed_time or previous_time
             first = False
     return result
@@ -172,6 +176,7 @@ def aggregate(increments: list[Increment]) -> dict[str, Total]:
     numerator = sum(i.values["cached_input_tokens"] for i in eligible)
     totals["cache_percentage"] = Total(100 * numerator / denominator if denominator else None, bool(denominator) and len(eligible) == len(increments) and all(i.complete for i in increments))
     return totals
+
 
 
 
