@@ -47,7 +47,7 @@ def validate_experiment(item):
             if not isinstance(group, dict) or not isinstance(group.get("name"), str) or not isinstance(group.get("run_count"), int) or isinstance(group.get("run_count"), bool) or group["run_count"] < 0 or not isinstance(group.get("measures"), dict):
                 raise ValueError("History group data is invalid.")
             for key, measure in group["measures"].items():
-                if key not in METRICS or not isinstance(measure, dict) or not isinstance(measure.get("eligible"), int) or isinstance(measure.get("eligible"), bool) or not 0 <= measure["eligible"] <= group["run_count"] or (measure.get("value") is not None and (isinstance(measure["value"], bool) or not isinstance(measure["value"], (int, float)))):
+                if key not in METRICS or not isinstance(measure, dict) or "value" not in measure or not isinstance(measure.get("eligible"), int) or isinstance(measure.get("eligible"), bool) or not 0 <= measure["eligible"] <= group["run_count"] or (measure.get("value") is not None and (isinstance(measure["value"], bool) or not isinstance(measure["value"], (int, float)))):
                     raise ValueError("History measure data is invalid.")
 
 
@@ -96,5 +96,6 @@ def record_snapshot(item, comparison, global_filters):
                            for group in comparison.groups]}
     item.setdefault("history", []).append(snapshot)
     validate_experiment(item)
+
 
 
