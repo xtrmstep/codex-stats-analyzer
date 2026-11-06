@@ -123,6 +123,17 @@ def calculate_increments(events: list[Event]) -> AccountingResult:
                     values[key] = None
                 else:
                     values[key] = raw[key] - previous[key]
+            if (values["reasoning_output_tokens"] is not None
+                    and values["output_tokens"] is not None
+                    and values["reasoning_output_tokens"] > values["output_tokens"]):
+                result.diagnostics.append(f"{event.reference}: reasoning output increment exceeds output increment.")
+                values["reasoning_output_tokens"] = None
+                valid = False
+            if (all(values[key] is not None for key in ("total_tokens", "input_tokens", "output_tokens"))
+                    and values["total_tokens"] != values["input_tokens"] + values["output_tokens"]):
+                result.diagnostics.append(f"{event.reference}: total increment differs from input plus output increments.")
+                values["total_tokens"] = None
+                valid = False
             if values["input_tokens"] is not None and values["cached_input_tokens"] is not None and values["cached_input_tokens"] <= values["input_tokens"]:
                 values["non_cached_input_tokens"] = values["input_tokens"] - values["cached_input_tokens"]
             else:
@@ -161,5 +172,6 @@ def aggregate(increments: list[Increment]) -> dict[str, Total]:
     numerator = sum(i.values["cached_input_tokens"] for i in eligible)
     totals["cache_percentage"] = Total(100 * numerator / denominator if denominator else None, bool(denominator) and len(eligible) == len(increments) and all(i.complete for i in increments))
     return totals
+
 
 
