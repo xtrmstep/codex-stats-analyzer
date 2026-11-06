@@ -137,6 +137,15 @@ def ingest(roots: list[Path]) -> IngestionResult:
                 message = "Incomplete final line" if partial else "Malformed JSON event"
                 result.diagnostics.append(Diagnostic(str(path), number, f"{message}: {exc}"))
                 continue
+            if not isinstance(raw.get("type"), str) or not raw["type"]:
+                result.diagnostics.append(Diagnostic(str(path), number, "Event type must be a non-empty string."))
+                continue
+            try:
+                canonical = json.dumps(raw, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+                canonical.encode("utf-8")
+            except (UnicodeEncodeError, TypeError, ValueError) as exc:
+                result.diagnostics.append(Diagnostic(str(path), number, f"Invalid event encoding or content: {exc}"))
+                continue
             parsed.append((number, raw))
             payload = raw.get("payload")
             if raw.get("type") == "session_meta" and isinstance(payload, dict):
@@ -165,3 +174,4 @@ def ingest(roots: list[Path]) -> IngestionResult:
             if raw.get("type") not in supported:
                 result.diagnostics.append(Diagnostic(str(path), number, f"Unsupported event type: {event.event_type}."))
     return result
+
