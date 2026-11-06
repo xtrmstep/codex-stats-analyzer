@@ -79,6 +79,8 @@ def analyze_agents(root_id: str, events: list[Event], increments: list[Increment
     skills: list[dict[str, str]] = []
     diagnostics: list[str] = []
     pending_status: list[tuple[str, str, dict, str]] = []
+    calls: dict[tuple[str, str], tuple[str, dict]] = {}
+    outputs: list[tuple[str, str, dict, str]] = []
     for event in events:
         agent = agents.setdefault(event.session_id, Agent(event.session_id))
         for attr, value in (("model", event.model), ("role", event.agent_role), ("nickname", event.agent_nickname)):
@@ -91,7 +93,19 @@ def analyze_agents(root_id: str, events: list[Event], increments: list[Increment
             activity.setdefault(agent.id, []).append((timestamp, event.timestamp, event.reference))
         evidence = event.evidence or {}
         kind = evidence.get("type")
-        if kind == "collab_agent_spawn":
+        if kind == "function_call":
+            call_id, name = evidence.get("call_id"), evidence.get("name")
+            if isinstance(call_id, str) and isinstance(name, str):
+                short_name = name.replace("__", ".").split(".")[-1]
+                if short_name in {"spawn_agent", "wait_agent"}:
+                    calls[(agent.id, call_id)] = (short_name, evidence.get("arguments", {}))
+                    if not evidence.get("arguments_valid", False):
+                        diagnostics.append(f"{event.reference}: {short_name} arguments are malformed or unavailable.")
+        elif kind == "function_call_output":
+            call_id = evidence.get("call_id")
+            if isinstance(call_id, str):
+                outputs.append((agent.id, call_id, evidence.get("output", {}), event.reference))
+        elif kind == "collab_agent_spawn":
             sender = evidence.get("sender_thread_id")
             receiver = evidence.get("receiver_thread_id")
             if isinstance(sender, str) and isinstance(receiver, str) and sender and receiver:
@@ -107,6 +121,29 @@ def analyze_agents(root_id: str, events: list[Event], increments: list[Increment
             else:
                 # Resolve after all events have established which threads exist.
                 pending_status.append((target, kind, evidence, event.reference))
+    for source_id, call_id, output, reference in outputs:
+        call = calls.get((source_id, call_id))
+        if not call:
+            continue
+        name, arguments = call
+        if not isinstance(output, dict) or not output:
+            diagnostics.append(f"{reference}: {name} result is missing or unsupported.")
+            continue
+        if name == "spawn_agent":
+            child = output.get("agent_id")
+            task = output.get("task_name")
+            if isinstance(child, str) and child:
+                agents.setdefault(child, Agent(child))
+                parents.setdefault(child, set()).add(source_id)
+            elif isinstance(task, str) and task:
+                child = f"task:{task}"
+                agents.setdefault(child, Agent(child, nickname=task))
+                parents.setdefault(child, set()).add(source_id)
+                diagnostics.append(f"{reference}: spawned task has no thread ID; association with session files is unknown.")
+            else:
+                diagnostics.append(f"{reference}: spawn result has no explicit agent identifier.")
+        elif name == "wait_agent" and output.get("timed_out") is True:
+            diagnostics.append(f"{reference}: wait timed out; agent status remains unknown.")
     for target, kind, evidence, reference in pending_status:
         if target not in agents:
             diagnostics.append(f"{reference}: status target {target} is unobserved; attribution withheld.")
@@ -191,5 +228,7 @@ def analyze_agents(root_id: str, events: list[Event], increments: list[Increment
     share = Total(None, False)
     return AgentAnalysis(agents, children, unlinked, len(depths), max(depths.values()) if depths else None,
                          main, sub, share, skills, diagnostics)
+
+
 
 

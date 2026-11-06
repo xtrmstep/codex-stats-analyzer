@@ -91,6 +91,30 @@ def _normalize(raw: dict[str, Any], session_id: str, source: Path, line: int, re
         for key in ("agent_id", "parent_agent_id", "thread_id", "receiver_thread_id", "sender_thread_id", "role", "nickname", "skill_name", "started_at", "completed_at", "status"):
             if _string(payload.get(key)):
                 evidence[key] = payload[key]
+    if kind == "response_item" and subtype in {"function_call", "function_call_output"}:
+        call_id = _string(payload.get("call_id"))
+        if call_id:
+            evidence = {"type": subtype, "call_id": call_id}
+            if subtype == "function_call":
+                name = _string(payload.get("name"))
+                if name:
+                    evidence["name"] = name
+                raw_arguments = payload.get("arguments")
+                try:
+                    arguments = json.loads(raw_arguments) if isinstance(raw_arguments, str) else raw_arguments
+                except (ValueError, TypeError):
+                    arguments = None
+                evidence["arguments_valid"] = isinstance(arguments, dict)
+                if isinstance(arguments, dict):
+                    evidence["arguments"] = {key: arguments[key] for key in ("task_name", "agent_id") if isinstance(arguments.get(key), str)}
+            else:
+                raw_output = payload.get("output")
+                try:
+                    output = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
+                except (ValueError, TypeError):
+                    output = None
+                if isinstance(output, dict):
+                    evidence["output"] = {key: output[key] for key in ("task_name", "agent_id", "status", "timed_out") if isinstance(output.get(key), (str, bool))}
     return Event(
         reference=reference, session_id=session_id, source=str(source), line=line,
         event_type=f"{kind}.{subtype}" if subtype else kind,
@@ -183,6 +207,8 @@ def ingest(roots: list[Path]) -> IngestionResult:
             if raw.get("type") not in supported:
                 result.diagnostics.append(Diagnostic(str(path), number, f"Unsupported event type: {event.event_type}."))
     return result
+
+
 
 
 
