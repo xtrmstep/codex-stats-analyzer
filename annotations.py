@@ -8,6 +8,8 @@ from pathlib import Path
 import tempfile
 from typing import Any
 
+from runs import validate_run
+
 SCHEMA_VERSION = 1
 
 
@@ -67,8 +69,10 @@ def _validate(data: Any, kind: str) -> None:
                     or not set(labels).issubset(label_ids)):
                 raise StorageError("Assignments require a session or run ID and unique existing label IDs.")
         for run in data["runs"]:
-            if not _text(run.get("session_id")):
-                raise StorageError("Each run needs a stable session_id.")
+            try:
+                validate_run(run)
+            except ValueError as exc:
+                raise StorageError(f"Invalid run: {exc}") from exc
     else:
         for experiment in data["experiments"]:
             if not isinstance(experiment.get("groups"), list) or not isinstance(experiment.get("metrics"), list):
@@ -189,6 +193,7 @@ def missing_sessions(snapshot: Snapshot, available_session_ids: set[str]) -> set
     references = {run["session_id"] for run in snapshot.data.get("runs", [])}
     references.update(item["target_id"] for item in snapshot.data.get("assignments", []) if item["target_type"] == "session")
     return references - available_session_ids
+
 
 
 
