@@ -78,6 +78,7 @@ def analyze_agents(root_id: str, events: list[Event], increments: list[Increment
     verified: dict[str, tuple[str, str, str]] = {}
     skills: list[dict[str, str]] = []
     diagnostics: list[str] = []
+    pending_status: list[tuple[str, str, dict, str]] = []
     for event in events:
         agent = agents.setdefault(event.session_id, Agent(event.session_id))
         for attr, value in (("model", event.model), ("role", event.agent_role), ("nickname", event.agent_nickname)):
@@ -99,13 +100,25 @@ def analyze_agents(root_id: str, events: list[Event], increments: list[Increment
             name = evidence.get("skill_name")
             if isinstance(name, str) and name:
                 skills.append({"agent_id": agent.id, "name": name, "reference": event.reference})
-        elif kind == "agent_started":
+        elif kind in {"agent_started", "agent_completed"}:
+            target = evidence.get("agent_id") or evidence.get("thread_id")
+            if not isinstance(target, str) or not target:
+                diagnostics.append(f"{event.reference}: agent status has no explicit target; attribution withheld.")
+            else:
+                # Resolve after all events have established which threads exist.
+                pending_status.append((target, kind, evidence, event.reference))
+    for target, kind, evidence, reference in pending_status:
+        if target not in agents:
+            diagnostics.append(f"{reference}: status target {target} is unobserved; attribution withheld.")
+            continue
+        agent = agents[target]
+        if kind == "agent_started":
             agent.status = "running"
-        elif kind == "agent_completed":
+        else:
             agent.status = evidence.get("status") if isinstance(evidence.get("status"), str) else "completed"
             start, end = evidence.get("started_at"), evidence.get("completed_at")
             if isinstance(start, str) and isinstance(end, str) and _time(start) and _time(end) and _time(start) <= _time(end):
-                verified[agent.id] = (start, end, event.reference)
+                verified[target] = (start, end, reference)
     if root_id not in agents:
         diagnostics.append(f"Root {root_id} has no observed events.")
     for child, candidates in parents.items():
@@ -178,4 +191,5 @@ def analyze_agents(root_id: str, events: list[Event], increments: list[Increment
     share = Total(None, False)
     return AgentAnalysis(agents, children, unlinked, len(depths), max(depths.values()) if depths else None,
                          main, sub, share, skills, diagnostics)
+
 
