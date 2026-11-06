@@ -1,6 +1,6 @@
 # 03 — Token increments and trustworthy totals
 
-Status: Implementation complete; independent review pending | Phase: 1 | Dependencies: 02
+Status: Complete; independent review passed | Phase: 1 | Dependencies: 02
 
 Specification: §3.3; MVP 2, 13.
 
@@ -20,6 +20,8 @@ Specification: §3.3; MVP 2, 13.
 - Session totals and disjoint agent/model totals reconcile where source coverage permits. Partial totals are marked as partial.
 
 ## Decisions and validation evidence
+
+- Independent Astra re-review passed at `09e91a3`, with both original edge cases reproduced successfully after fixes. No blocking findings remain; parent rollup uncertainty is a documented limitation.
 
 - Sampled only key shapes in local files: both event-message total and thread-usage cumulative records contain input, cached input, output, reasoning output and total counters. Prefer event-message totals per session where present, otherwise thread totals; their overlap is unverified, so never add the two families. Per-response and last-usage counters are not added independently.
 - The first observed cumulative snapshot is a partial baseline from zero. Repeated counters produce zero increments, duplicate references are ignored, timestamp regressions are excluded, and counter decreases start a partial reset epoch. Missing, invalid and inconsistent values stay unknown or partial. Input includes cached input; output includes reasoning output; neither child is added to its parent. Non-cached input is the difference. Cache percentage uses paired eligible summed counters and is unknown for zero input.
