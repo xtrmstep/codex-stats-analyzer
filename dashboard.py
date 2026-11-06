@@ -149,7 +149,17 @@ def details(root, selected, events, increments):
     st.write("Subagent share: Unknown — parent and child counter scope is unresolved. Main and subagent figures may overlap and must not be added.")
     st.caption("Observed spans show the first and last recorded events, not verified execution duration. Single recorded timestamps are listed in the table.")
     if timeline:
-        st.plotly_chart(px.timeline(pd.DataFrame(timeline), x_start="Start", x_end="End", y="Agent", color="Evidence"), use_container_width=True)
+        timeline_frame = pd.DataFrame(timeline)
+        for column in ("Start", "End"):
+            timeline_frame[column] = pd.to_datetime(timeline_frame[column], format="mixed", utc=True, errors="coerce")
+        invalid = timeline_frame["Start"].isna() | timeline_frame["End"].isna() | (timeline_frame["End"] < timeline_frame["Start"])
+        if invalid.any():
+            st.warning(f"{invalid.sum()} activity interval(s) have invalid endpoints and cannot be plotted.")
+        timeline_frame = timeline_frame.loc[~invalid]
+        if not timeline_frame.empty:
+            st.plotly_chart(px.timeline(timeline_frame, x_start="Start", x_end="End", y="Agent", color="Evidence"), use_container_width=True)
+        else:
+            st.info("No activity intervals with two valid endpoints.")
     else:
         st.info("No activity intervals with two known endpoints.")
     if hierarchy.skills:
@@ -158,5 +168,6 @@ def details(root, selected, events, increments):
         with st.expander("Hierarchy limitations"):
             for item in hierarchy.diagnostics:
                 st.write(item)
+
 
 
