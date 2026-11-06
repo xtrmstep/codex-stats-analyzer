@@ -1,10 +1,12 @@
 # 04 — Agent hierarchy, activity and skill evidence
 
-Status: Implementation complete; independent review pending | Phase: 1 | Dependencies: 02, 03
+Status: Complete; independent review passed | Phase: 1 | Dependencies: 02, 03
 
 Specification: §§3.2, 4.1–4.3; MVP 3, 4, 13.
 
 ## Scope
+
+Review: independent Astra review passed at `a57b35c`; original findings and full-ancestry overlap checks resolved. Recorded limitations below still apply.
 
 - Reconstruct main, child and nested agents from explicit identifiers and coordination events, linking associated files only when evidence supports the relationship.
 - Keep unlinked agents separate. Handle missing parents, duplicate links and cycles without inventing a tree.
