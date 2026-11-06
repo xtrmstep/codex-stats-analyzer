@@ -39,9 +39,10 @@ def render_experiments(data, events, increments, frame, selection, selected_agen
         saved = {item["id"]: item for item in snapshot.data["experiments"]}
         choice = st.selectbox("Experiment", ["New experiment"] + list(saved), format_func=lambda key: saved[key]["name"] if key in saved else key)
         current = saved.get(choice, {})
-        name = st.text_input("Experiment name", value=current.get("name", ""))
+        editor_key = f"experiment_editor_{choice}"
+        name = st.text_input("Experiment name", value=current.get("name", ""), key=f"{editor_key}_name")
         existing = current.get("groups", [])
-        count = st.number_input("Number of groups", min_value=2, max_value=20, value=max(2, min(20, len(existing) or 2)), step=1)
+        count = st.number_input("Number of groups", min_value=2, max_value=20, value=max(2, min(20, len(existing) or 2)), step=1, key=f"{editor_key}_count")
         definitions = {item["id"]: item["name"] for item in data["labels"]}
         available = {
             "label_ids": list(definitions),
@@ -56,23 +57,23 @@ def render_experiments(data, events, increments, frame, selection, selected_agen
         unsupported_metrics = [metric for metric in current.get("metrics", []) if metric not in METRICS]
         if unsupported_metrics:
             st.warning("Unsupported saved metrics will be removed if this definition is saved: " + ", ".join(unsupported_metrics))
-        with st.form("experiment_editor"):
+        with st.form(editor_key):
             for index in range(int(count)):
                 old = existing[index] if index < len(existing) else {}
                 old_filters = old.get("filters", {})
                 st.write(f"Group {index + 1}")
-                group_name = st.text_input("Group name", value=old.get("name", f"Group {index + 1}"), key=f"experiment_group_{index}_name")
+                group_name = st.text_input("Group name", value=old.get("name", f"Group {index + 1}"), key=f"{editor_key}_group_{index}_name")
                 filters = {}
                 for field in FILTER_FIELDS:
                     prior = old_filters.get(field) or []
                     options = sorted(set(available[field]) | set(prior))
                     labels = {"label_ids": "Labels", "task_types": "Task types", "execution_modes": "Execution modes", "projects": "Projects", "models": "Models", "sessions": "Sessions", "agent_roles": "Agent roles"}
-                    selected = st.multiselect(labels[field], options, default=prior, key=f"experiment_group_{index}_{field}", format_func=(lambda value: definitions.get(value, f"Missing label: {value}")) if field == "label_ids" else str)
+                    selected = st.multiselect(labels[field], options, default=prior, key=f"{editor_key}_group_{index}_{field}", format_func=(lambda value: definitions.get(value, f"Missing label: {value}")) if field == "label_ids" else str)
                     filters[field] = selected or None
                 modes = ["all", "any"]
-                filters["label_mode"] = st.selectbox("Match labels", modes, index=modes.index(old_filters.get("label_mode", "all")), key=f"experiment_group_{index}_mode")
+                filters["label_mode"] = st.selectbox("Match labels", modes, index=modes.index(old_filters.get("label_mode", "all")), key=f"{editor_key}_group_{index}_mode")
                 groups.append({"name": group_name, "filters": filters})
-            metrics = st.multiselect("Comparison metrics", list(METRICS), default=[metric for metric in current.get("metrics", []) if metric in METRICS] if current else ["mean_tokens", "median_tokens", "elapsed_seconds"])
+            metrics = st.multiselect("Comparison metrics", list(METRICS), default=[metric for metric in current.get("metrics", []) if metric in METRICS] if current else ["mean_tokens", "median_tokens", "elapsed_seconds"], key=f"{editor_key}_metrics")
             save = st.form_submit_button("Save experiment")
             delete = st.form_submit_button("Delete experiment", disabled=not current)
         candidate = dict(current)
@@ -138,10 +139,11 @@ def render_experiments(data, events, increments, frame, selection, selected_agen
             if history:
                 st.dataframe(pd.DataFrame(history), hide_index=True, use_container_width=True)
                 st.write("Recorded global filter contexts", [{"recorded_at": snap["recorded_at"], "filters": snap["global_filters"]} for snap in current["history"]])
-                history_metric = st.selectbox("History metric", metrics) if metrics else None
+                history_metric = st.selectbox("History metric", metrics, key=f"{editor_key}_history_metric") if metrics else None
                 filtered = pd.DataFrame([row for row in history if row["Metric"] == history_metric])
                 if not filtered.empty and filtered["Value"].notna().any():
                     st.plotly_chart(px.line(filtered, x="Recorded at", y="Value", color="Group", markers=True, hover_data=["Eligible", "Runs"], title="Recorded calculation history"), use_container_width=True)
                 st.caption("Recorded points may use different global filters; inspect the saved snapshot context before comparing them.")
+
 
 
