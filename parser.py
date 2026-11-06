@@ -73,7 +73,7 @@ def _string(value: Any) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
-def _normalize(raw: dict[str, Any], session_id: str, source: Path, line: int, reference: str) -> Event:
+def _normalize(raw: dict[str, Any], session_id: str, source: Path, line: int, reference: str, metadata: dict[str, str]) -> Event:
     payload = raw.get("payload") if isinstance(raw.get("payload"), dict) else {}
     kind = _string(raw.get("type")) or "unknown"
     subtype = _string(payload.get("type"))
@@ -98,8 +98,8 @@ def _normalize(raw: dict[str, Any], session_id: str, source: Path, line: int, re
         project_path=_string(context.get("cwd")), model=_string(context.get("model")),
         reasoning_effort=_string(context.get("effort")),
         agent_id=_string(payload.get("agent_id")) or _string(payload.get("thread_id")),
-        parent_agent_id=_string(payload.get("parent_agent_id")) or (_string(payload.get("parent_thread_id")) if kind == "session_meta" else None),
-        agent_role=_string(payload.get("agent_role")), agent_nickname=_string(payload.get("agent_nickname")),
+        parent_agent_id=_string(payload.get("parent_agent_id")) or (_string(payload.get("parent_thread_id")) if kind == "session_meta" else None) or metadata.get("parent_thread_id"),
+        agent_role=_string(payload.get("agent_role")) or metadata.get("agent_role"), agent_nickname=_string(payload.get("agent_nickname")) or metadata.get("agent_nickname"),
         token_counters=token_counters, evidence=evidence,
     )
 
@@ -127,6 +127,7 @@ def ingest(roots: list[Path]) -> IngestionResult:
             continue
         parsed = []
         session_id = None
+        metadata: dict[str, str] = {}
         for number, line in enumerate(lines, 1):
             try:
                 raw = json.loads(line.decode("utf-8-sig"))
@@ -149,6 +150,14 @@ def ingest(roots: list[Path]) -> IngestionResult:
             parsed.append((number, raw))
             payload = raw.get("payload")
             if raw.get("type") == "session_meta" and isinstance(payload, dict):
+                source = payload.get("source")
+                subagent = source.get("subagent") if isinstance(source, dict) else None
+                spawn = subagent.get("thread_spawn") if isinstance(subagent, dict) else None
+                if isinstance(spawn, dict):
+                    for key in ("parent_thread_id", "agent_role", "agent_nickname"):
+                        value = _string(spawn.get(key))
+                        if value:
+                            metadata[key] = value
                 candidate = _string(payload.get("session_id")) or _string(payload.get("id"))
                 if candidate and session_id and candidate != session_id:
                     result.diagnostics.append(Diagnostic(str(path), number, "Conflicting session metadata IDs."))
@@ -169,9 +178,10 @@ def ingest(roots: list[Path]) -> IngestionResult:
             if reference in seen:
                 continue
             seen.add(reference)
-            event = _normalize(raw, session_id, path, number, reference)
+            event = _normalize(raw, session_id, path, number, reference, metadata)
             result.events.append(event)
             if raw.get("type") not in supported:
                 result.diagnostics.append(Diagnostic(str(path), number, f"Unsupported event type: {event.event_type}."))
     return result
+
 

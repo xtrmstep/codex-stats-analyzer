@@ -25,3 +25,4 @@ Specification: §§2.1–2.2, 3.1–3.2, 8; MVP 1, 11, 13.
 - Inline synthetic checks covered nested overlapping roots, missing and empty directories, malformed and partial lines, unknown events, counters, repeated imports, append stability, archive relocation, duplicated copies, and unchanged source bytes and modification time. No unit-test files were added.
 - Independent review is pending.
 
+- Review fixes: inline malformed-record checks confirmed non-string event types and escaped lone surrogates are diagnosed while later valid events remain available. A synthetic nested `source.subagent.thread_spawn` session confirmed parent ID, role and nickname propagate to later events without treating conversation text as evidence. Python compilation passed after each fix; independent re-review remains pending.
