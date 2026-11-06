@@ -43,7 +43,7 @@ def run_summary(matches_list, events, data=None):
         rows.append({"Explicit labels": ", ".join(names[x] for x in sorted(explicit) if x in names),
                      "Inherited labels": ", ".join(names[x] for x in sorted(inherited) if x in names),
                      "Run": run["name"], "Run ID": run["id"], "Session": run["session_id"],
-                     "Tokens": total.value, "Coverage": "Partial or unknown",
+                     "Tokens": total.value, "Coverage": "Partial or unknown", "Attribution": result.attribution + "; root thread only",
                      "Outcome": run.get("outcome", "unknown"), "Task type": run.get("task_type", ""),
                      "Full run elapsed seconds": result.elapsed_seconds, "Elapsed provenance": result.elapsed_provenance,
                      "Diagnostics": "; ".join(result.diagnostics)})
@@ -121,6 +121,7 @@ def manage_runs(store, snapshot, events, increments):
                 st.rerun()
             except (ValueError, StorageError) as exc:
                 st.error(str(exc))
+
 
 
 
