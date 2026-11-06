@@ -98,7 +98,7 @@ def render(sources):
         session_ids = sorted(selected["session"].dropna().unique().tolist())
         if session_ids:
             root = st.selectbox("Session detail", session_ids)
-            details(root, selected, parsed.events, accounting.increments)
+            details(root, selected, parsed.events, accounting.increments, use_dates)
     with st.expander(f"Parsing and accounting diagnostics ({len(parsed.diagnostics) + len(accounting.diagnostics)})"):
         for item in parsed.diagnostics:
             st.write(f"{item.source}:{item.line or '-'} — {item.message}")
@@ -106,7 +106,7 @@ def render(sources):
             st.write(item)
 
 
-def details(root, selected, events, increments):
+def details(root, selected, events, increments, date_filter_active=False):
     """Show hierarchy as context, while all usage follows active filters."""
     hierarchy = analyze_agents(root, events, increments)
     st.subheader("Agent hierarchy")
@@ -123,6 +123,8 @@ def details(root, selected, events, increments):
     tree_ids = set(hierarchy.agents) - set(hierarchy.unlinked)
     rows = []
     timeline = []
+    selected_references = set(selected["reference"])
+    selected_agents = set(selected["agent"].dropna())
     for agent_id in sorted(tree_ids):
         agent = hierarchy.agents[agent_id]
         agent_frame = selected.loc[selected["agent"] == agent_id]
@@ -132,9 +134,16 @@ def details(root, selected, events, increments):
                      "Cache %": _display(totals.totals["cache_percentage"], "%"),
                      "First observed": agent.activity.first, "Last observed": agent.activity.last})
         activity = agent.activity
-        if activity.first and activity.last and activity.first != activity.last:
-            timeline.append({"Agent": agent_id, "Start": activity.first, "End": activity.last, "Evidence": "Observed activity span"})
-        if activity.verified_start and activity.verified_end:
+        times = pd.to_datetime(
+            [event.timestamp for event in events if event.session_id == agent_id
+             and event.reference in selected_references and event.timestamp],
+            format="mixed", utc=True, errors="coerce")
+        times = times[~times.isna()]
+        if len(times) > 1 and times.min() < times.max():
+            timeline.append({"Agent": agent_id, "Start": times.min(), "End": times.max(), "Evidence": "Observed activity span"})
+        if (agent_id in selected_agents and not date_filter_active
+                and activity.verified_reference in selected_references
+                and activity.verified_start and activity.verified_end):
             timeline.append({"Agent": agent_id, "Start": activity.verified_start, "End": activity.verified_end, "Evidence": "Verified execution interval"})
     st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
     st.write(f"Main agent tokens under filters: {_display(summarize(selected.loc[selected['agent'] == root], events).totals['total_tokens'])}")
@@ -147,7 +156,7 @@ def details(root, selected, events, increments):
     if any(item["Tokens"] is not None for item in comparison):
         st.plotly_chart(px.bar(pd.DataFrame(comparison), x="Agent group", y="Tokens", color="Coverage"), use_container_width=True)
     st.write("Subagent share: Unknown — parent and child counter scope is unresolved. Main and subagent figures may overlap and must not be added.")
-    st.caption("Observed spans show the first and last recorded events, not verified execution duration. Single recorded timestamps are listed in the table.")
+    st.caption("Timeline spans use matching events only and do not establish execution duration. The hierarchy table shows full context. Verified intervals are omitted when a date filter is active because their boundaries may lie outside it.")
     if timeline:
         timeline_frame = pd.DataFrame(timeline)
         for column in ("Start", "End"):
@@ -162,12 +171,15 @@ def details(root, selected, events, increments):
             st.info("No activity intervals with two valid endpoints.")
     else:
         st.info("No activity intervals with two known endpoints.")
-    if hierarchy.skills:
-        st.write("Explicit skill evidence", pd.DataFrame(hierarchy.skills))
+    selected_skills = [skill for skill in hierarchy.skills if skill["agent_id"] in tree_ids
+                       and skill["agent_id"] in selected_agents and skill["reference"] in selected_references]
+    if selected_skills:
+        st.write("Explicit skill evidence", pd.DataFrame(selected_skills))
     if hierarchy.diagnostics:
         with st.expander("Hierarchy limitations"):
             for item in hierarchy.diagnostics:
                 st.write(item)
+
 
 
 
