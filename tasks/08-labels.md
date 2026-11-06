@@ -1,6 +1,6 @@
 # 08 — Labels, bulk assignment and classification filters
 
-Status: Not started | Phase: 2 | Dependencies: 05, 07
+Status: Implementation complete; independent review pending | Phase: 2 | Dependencies: 05, 07
 
 Specification: §§2.4, 5.1, 6.1; MVP 5, 7, 9.
 
@@ -17,3 +17,10 @@ Specification: §§2.4, 5.1, 6.1; MVP 5, 7, 9.
 - Verify CRUD, bulk actions, persistence and filter combinations against known assignments.
 - Renaming/deleting labels leaves no invalid references; session/run inheritance follows the documented policy.
 - Runs created in task 09 can use the same assignment and filtering functions.
+
+## Decisions and validation evidence
+
+- Labels have stable IDs, a unique case-insensitive name and optional key/value pair; duplicate structured pairs are rejected case-insensitively. Rename preserves assignments; deletion removes the ID from all assignments. Bulk add/remove merges duplicate assignment rows. Runs inherit session labels plus explicit run labels, with each shown separately. Manual classifications are not evidence of skill or agent use.
+- Label selections combine as all or any, then intersect with task type, execution mode and all other filters. Structured keys `task_type` and `execution_mode` provide classification. For a run, a non-empty direct metadata value overrides labels for that field; otherwise inherited/explicit structured values apply. The global dashboard filters session assignments only: a run label cannot select a whole session's usage before task 09 interval attribution. Run matching is provided for subsequent run workflows; run-driven global filtering belongs to task 10. No usage is multiplied by labels.
+- Inline checks passed label CRUD and duplicate handling, bulk add/remove, persistence, run inheritance and metadata precedence, all/any plus execution mode filtering, and manual provenance. A Streamlit stub rendered management against an empty store without writing. Python compilation passed. Browser interaction remains unverified. Independent review pending.
+

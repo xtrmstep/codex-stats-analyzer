@@ -8,6 +8,7 @@ import pandas as pd
 from analytics import Increment, Total, aggregate
 from agents import analyze_agents
 from parser import Event
+from labels import assigned, matches
 
 
 @dataclass(frozen=True)
@@ -24,6 +25,10 @@ class Filters:
     models: frozenset[str] | None = None
     sessions: frozenset[str] | None = None
     agent_roles: frozenset[str] | None = None
+    label_ids: frozenset[str] | None = None
+    label_mode: str = "all"
+    task_types: frozenset[str] | None = None
+    execution_modes: frozenset[str] | None = None
 
 
 @dataclass(frozen=True)
@@ -78,7 +83,7 @@ def build_dataset(events: list[Event], increments: list[Increment]) -> pd.DataFr
     return frame
 
 
-def filter_dataset(frame: pd.DataFrame, selection: Filters) -> pd.DataFrame:
+def filter_dataset(frame: pd.DataFrame, selection: Filters, annotations: dict | None = None) -> pd.DataFrame:
     """Apply all selected dimensions and inclusive UTC dates by intersection."""
     if selection.start_date and selection.end_date and selection.start_date > selection.end_date:
         raise ValueError("Start date must not be after end date.")
@@ -91,7 +96,17 @@ def filter_dataset(frame: pd.DataFrame, selection: Filters) -> pd.DataFrame:
         mask &= frame["timestamp"] >= pd.Timestamp(selection.start_date, tz="UTC")
     if selection.end_date:
         mask &= frame["timestamp"] < pd.Timestamp(selection.end_date + timedelta(days=1), tz="UTC")
-    return frame.loc[mask].copy()
+    manual = any(value is not None for value in (selection.label_ids, selection.task_types, selection.execution_modes))
+    if manual:
+        if annotations is None:
+            raise ValueError("Manual filters require loaded annotations.")
+        sessions = {session for session in frame["session"].dropna().unique()
+                    if matches(annotations, assigned(annotations, "session", session), selection.label_ids,
+                               selection.label_mode, selection.task_types, selection.execution_modes)}
+        mask &= frame["session"].isin(sessions)
+    result = frame.loc[mask].copy()
+    result.attrs["manual_filter"] = manual
+    return result
 
 
 def _overlapping_streams(frame: pd.DataFrame, events: list[Event]) -> bool:
@@ -123,10 +138,11 @@ def summarize(frame: pd.DataFrame, events: list[Event]) -> Metrics:
     elif set(frame["session"].dropna()) - set(usage_frame["session"].dropna()):
         totals = {name: Total(total.value, False) for name, total in totals.items()}
     refs = tuple(dict.fromkeys(frame["reference"].tolist()))
+    manual_provenance = ("manual classification filters",) if frame.attrs.get("manual_filter") else ()
     return Metrics(totals, frame["session"].nunique(), frame["agent"].nunique(),
                    Total(None, False), refs,
                    (("observed events", "observed counters", "estimated timing within counter intervals")
-                    if increments else ("observed events",) if not frame.empty else ()))
+                    if increments else ("observed events",) if not frame.empty else ()) + manual_provenance)
 
 
 def grouped(frame: pd.DataFrame, events: list[Event], dimension: str) -> list[tuple[object, Metrics]]:
@@ -151,6 +167,7 @@ def time_buckets(frame: pd.DataFrame, events: list[Event], frequency: str) -> li
         dated["bucket"] = pd.to_datetime(day.dt.strftime("%Y-%m-01"), utc=True, errors="coerce")
     return [(None if pd.isna(key) else key, summarize(group, events))
             for key, group in dated.groupby("bucket", dropna=False, sort=True)]
+
 
 
 

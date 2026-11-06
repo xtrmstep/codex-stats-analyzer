@@ -1,5 +1,7 @@
 """Streamlit dashboard using the shared analytics contract."""
 
+from pathlib import Path
+
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -8,6 +10,8 @@ from agents import analyze_agents
 from analytics import calculate_increments
 from metrics import Filters, build_dataset, filter_dataset, grouped, summarize, time_buckets
 from parser import ingest
+from annotations import MetadataStore, StorageError
+from labels_ui import manage
 
 
 def _display(total, suffix=""):
@@ -34,7 +38,16 @@ def render(sources):
     parsed = ingest(sources)
     accounting = calculate_increments(parsed.events)
     frame = build_dataset(parsed.events, accounting.increments)
+    store = MetadataStore(Path(__file__).resolve().parent / "data" / "annotations.json", "annotations")
+    try:
+        snapshot = store.load()
+    except StorageError as exc:
+        st.error(f"Manual labels unavailable: {exc}")
+        snapshot = None
+    if snapshot is not None:
+        manage(store, snapshot, sorted(frame["session"].dropna().unique().tolist()))
     st.sidebar.header("Filters")
+    st.sidebar.caption("Manual filters apply to session labels. Run-only labels do not select session usage; run filtering is added with run attribution.")
     use_dates = st.sidebar.checkbox("Filter dates (UTC)")
     start = end = None
     if use_dates:
@@ -45,12 +58,22 @@ def render(sources):
             bounds = st.sidebar.date_input("UTC date range", (dates.min().date(), dates.max().date()))
             if len(bounds) == 2:
                 start, end = bounds
+    definitions = {item["id"]: item for item in snapshot.data["labels"]} if snapshot else {}
+    chosen_labels = st.sidebar.multiselect("Manual labels", list(definitions), format_func=lambda item: definitions[item]["name"])
+    label_mode = st.sidebar.radio("Match labels", ["all", "any"], horizontal=True)
+    task_values = sorted({item.get("value") for item in definitions.values() if item.get("key", "").casefold() == "task_type" and item.get("value")})
+    mode_values = sorted({item.get("value") for item in definitions.values() if item.get("key", "").casefold() == "execution_mode" and item.get("value")})
+    task_types = st.sidebar.multiselect("Manual task type", task_values)
+    execution_modes = st.sidebar.multiselect("Manual execution mode", mode_values)
     selection = Filters(start_date=start, end_date=end,
+                        label_ids=frozenset(chosen_labels) if chosen_labels else None, label_mode=label_mode,
+                        task_types=frozenset(task_types) if task_types else None,
+                        execution_modes=frozenset(execution_modes) if execution_modes else None,
                         projects=_options(frame, "project", "Projects"),
                         models=_options(frame, "model", "Models"),
                         sessions=_options(frame, "session", "Sessions"),
                         agent_roles=_options(frame, "agent_role", "Agent roles"))
-    selected = filter_dataset(frame, selection)
+    selected = filter_dataset(frame, selection, snapshot.data if snapshot else None)
     available_agents = sorted(selected["agent"].dropna().unique().tolist())
     selected_agent = st.sidebar.selectbox("Agent", ["All agents"] + available_agents)
     if selected_agent != "All agents":
@@ -179,6 +202,8 @@ def details(root, selected, events, increments, date_filter_active=False):
         with st.expander("Hierarchy limitations"):
             for item in hierarchy.diagnostics:
                 st.write(item)
+
+
 
 
 
