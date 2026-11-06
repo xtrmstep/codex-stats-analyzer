@@ -1,10 +1,12 @@
 # 07 — Atomic local metadata storage
 
-Status: Implementation complete; independent review pending | Phase: 2 | Dependencies: 01, 02
+Status: Complete; independent review passed | Phase: 2 | Dependencies: 01, 02
 
 Specification: §§2.3–2.5, 5.3, 7.4, 8; MVP 9.
 
 ## Scope
+
+Review: independent Astra re-review passed at `d55aee7`; combined replacement/cleanup failure verified with independent lock release.
 
 - Define versioned schemas for `data/annotations.json` (labels, assignments, runs and metadata) and `data/experiments.json` (comparison definitions and any agreed history representation).
 - Reference stable sessions/events independently of source file locations; tolerate temporarily missing source sessions without deleting annotations.
