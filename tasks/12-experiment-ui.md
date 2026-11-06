@@ -1,10 +1,12 @@
 # 12 — Saved experiments and comparative visualizations
 
-Status: Implementation complete; independent review pending | Phase: 3 | Dependencies: 07, 10, 11
+Status: Complete; independent code review passed | Phase: 3 | Dependencies: 07, 10, 11
 
 Specification: §§7.1–7.4; MVP 8, 9, 13.
 
 ## Scope
+
+Review: independent Astra re-review passed at `f35391c`; experiment-scoped state and history-value validation verified. Browser/offline validation remains for task 14.
 
 - Build a comparison editor for two or more groups, label/filter definitions, selected metrics and experiment name.
 - Provide a comparison table, grouped aggregate bar charts, token-consumption box plots and experiment-history trend charts.
