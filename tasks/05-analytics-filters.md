@@ -1,6 +1,6 @@
 # 05 — Shared analytics and global filter contract
 
-Status: Not started | Phase: 1 | Dependencies: 03, 04
+Status: Implementation complete; independent review pending | Phase: 1 | Dependencies: 03, 04
 
 Specification: §§3.3, 6.1–6.3.
 
@@ -17,3 +17,11 @@ Specification: §§3.3, 6.1–6.3.
 
 - Deterministic fixtures verify cross-filter intersections, bucket boundaries, distinct counts, weighted cache ratios, unknown values and empty results.
 - Every consuming view uses this shared contract; no chart maintains a separate conflicting total calculation.
+
+## Decisions and validation evidence
+
+- All filters intersect. Dates are inclusive UTC calendar days; timestamps are converted to UTC, and absent or invalid timestamps are excluded only when a date filter is active. Daily buckets begin at UTC midnight, weekly buckets on Monday UTC and monthly buckets on the first UTC day; missing timestamps retain an unknown bucket. No selection means unrestricted; an empty selection matches nothing and missing dimensions do not match selected values.
+- Metrics operate on accounting increments, carry source references and observed-counter/estimated-timing provenance, preserve unknown and partial totals, and use task 03's weighted paired cache ratio. Distinct counts cover sessions and agents represented by selected increments, not agents with no token record. Main/subagent share remains unknown because parent inclusion is unresolved. A known ancestor and descendant are never combined even when an intermediate agent is filtered out. Group totals can overlap and must not be summed to infer a global total.
+- Agent-role filters select usage rows only; hierarchy evidence remains available from the full event collection as context, not as additional usage. Phase 2 should join run and label metadata to increment identities via a membership filter, deduplicating references before global aggregation; overlapping runs or multiple labels must not multiply global usage. Task type and execution mode belong in that same filter layer, with manual provenance retained. Run/label aggregation remains deferred to task 10.
+- Inline synthetic checks passed intersection of project, model, role and dates, UTC offset and week/month boundaries, distinct counts, weighted cache ratio, unknown groups, partial values and empty results. Python compilation passed; consuming views are implemented in task 06. Independent review pending.
+
