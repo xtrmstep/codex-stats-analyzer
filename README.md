@@ -12,7 +12,7 @@ For installation without network access, first prepare compatible Python 3.12 Wi
 py -3.12 -m pip download --only-binary=:all: -r requirements.txt -d wheelhouse
 ```
 
-Transfer the wheelhouse to the target machine and run `setup.bat "C:\path to\wheelhouse"`. Setup uses `--no-index` and installs only from that directory. Runtime is designed for local use, though full offline browser operation has not yet been verified.
+Transfer the wheelhouse to the target machine and run `setup.bat "C:\path to\wheelhouse"`. Setup uses `--no-index` and installs only from that directory. Runtime is designed for local use. A synthetic browser workflow including saved runs and comparison history passed across restart with the Python application process restricted to loopback; physical network disconnection and browser-level network blocking have not been verified.
 
 ## Sources and refresh
 
@@ -45,3 +45,5 @@ Download buttons export the displayed filtered session, run and comparison table
 `data/annotations.json` stores labels, assignments and runs. `data/experiments.json` stores comparison definitions and explicit history. These files and `.venv` are excluded from version control. Back up both JSON files while the application is not writing; restore them to `data/` to recover metadata. Original Codex source files are never used for annotation storage.
 
 Writes validate the versioned data, use a same-directory temporary file and atomic replacement, and check for concurrent changes. If a file is corrupt or its schema version is unsupported, preserve it and restore a backup or use a compatible application version; the app will not silently replace it with an empty document. A `.lock` file may remain after interruption: inspect it and remove it only after confirming no writer is active. Cooperating application writers use the lock; unrelated programs can ignore it.
+
+
