@@ -45,3 +45,5 @@ Specification: §§1, 8–11; all MVP acceptance criteria.
 | 11. Preserve sources | Synthetic source hashes and modification times were unchanged after reads. |
 | 12. Offline/no authentication | Local synthetic launch succeeded without entering credentials; network-disconnected runtime and asset checks remain. |
 | 13. Observed/manual/estimated distinctions | Synthetic records and UI labels retain provenance; browser review of the complete workflow remains. |
+
+- Follow-up KPI fix: numeric KPI values no longer include long coverage suffixes; a separate caption reports complete, partial or unknown for each metric. Inline checks verified compact and unknown values and preserved table formatting; compilation passed. Browser verification is pending.

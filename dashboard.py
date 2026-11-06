@@ -28,6 +28,13 @@ def _display(total, suffix=""):
     return f"{number}{suffix}" + (" (partial)" if not total.complete else "")
 
 
+def _metric_value(total, suffix=""):
+    """Keep the compact KPI value separate from its coverage description."""
+    if total.value is None:
+        return "Unknown"
+    number = f"{total.value:,.1f}" if isinstance(total.value, float) else f"{total.value:,}"
+    return f"{number}{suffix}"
+
 def _options(frame, column, label):
     values = sorted(frame[column].dropna().unique().tolist())
     selected = st.sidebar.multiselect(label, values)
@@ -140,11 +147,14 @@ def render(sources):
     metrics = summarize(selected, parsed.events)
     st.caption("UTC dates filter observed event times. Usage may have occurred before its counter timestamp. Partial totals are not complete coverage.")
     columns = st.columns(5)
-    columns[0].metric("Total tokens", _display(metrics.totals["total_tokens"]))
-    columns[1].metric("Input tokens", _display(metrics.totals["input_tokens"]))
-    columns[2].metric("Output tokens", _display(metrics.totals["output_tokens"]))
-    columns[3].metric("Cache percentage", _display(metrics.totals["cache_percentage"], "%"))
+    columns[0].metric("Total tokens", _metric_value(metrics.totals["total_tokens"]))
+    columns[1].metric("Input tokens", _metric_value(metrics.totals["input_tokens"]))
+    columns[2].metric("Output tokens", _metric_value(metrics.totals["output_tokens"]))
+    columns[3].metric("Cache percentage", _metric_value(metrics.totals["cache_percentage"], "%"))
     columns[4].metric("Sessions / agents", f"{metrics.sessions} / {metrics.agents}")
+    coverage = [(label, metrics.totals[key]) for label, key in
+                (("Total", "total_tokens"), ("Input", "input_tokens"), ("Output", "output_tokens"), ("Cache", "cache_percentage"))]
+    st.caption("Coverage: " + "; ".join(f"{label}: {'unknown' if total.value is None else 'complete' if total.complete else 'partial'}" for label, total in coverage))
     st.caption(f"Subagent share: {_display(metrics.subagent_share, '%')}. Parent counters may include child usage.")
     run_rows, run_mean, run_median = run_summary(run_matches, parsed.events, snapshot.data if snapshot else None)
     run_columns = st.columns(3)
@@ -305,6 +315,7 @@ def details(root, selected, events, increments, date_filter_active=False):
         with st.expander("Hierarchy limitations"):
             for item in hierarchy.diagnostics:
                 st.write(item)
+
 
 
 
