@@ -86,9 +86,9 @@ def _normalize(raw: dict[str, Any], session_id: str, source: Path, line: int, re
         if isinstance(info, dict):
             token_counters = {key: info[key] for key in ("total_token_usage", "last_token_usage") if isinstance(info.get(key), dict)} or None
     evidence = None
-    if kind == "event_msg" and subtype and any(term in subtype.lower() for term in ("agent", "collab", "skill")):
+    if kind == "event_msg" and subtype in {"collab_agent_spawn", "agent_started", "agent_completed", "skill_invoked"}:
         evidence = {"type": subtype}
-        for key in ("agent_id", "parent_agent_id", "thread_id", "receiver_thread_id", "sender_thread_id", "role", "nickname", "skill_name"):
+        for key in ("agent_id", "parent_agent_id", "thread_id", "receiver_thread_id", "sender_thread_id", "role", "nickname", "skill_name", "started_at", "completed_at", "status"):
             if _string(payload.get(key)):
                 evidence[key] = payload[key]
     return Event(
@@ -183,5 +183,6 @@ def ingest(roots: list[Path]) -> IngestionResult:
             if raw.get("type") not in supported:
                 result.diagnostics.append(Diagnostic(str(path), number, f"Unsupported event type: {event.event_type}."))
     return result
+
 
 

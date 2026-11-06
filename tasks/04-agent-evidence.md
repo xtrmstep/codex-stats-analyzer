@@ -1,6 +1,6 @@
 # 04 — Agent hierarchy, activity and skill evidence
 
-Status: Not started | Phase: 1 | Dependencies: 02, 03
+Status: Implementation complete; independent review pending | Phase: 1 | Dependencies: 02, 03
 
 Specification: §§3.2, 4.1–4.3; MVP 3, 4, 13.
 
@@ -18,3 +18,11 @@ Specification: §§3.2, 4.1–4.3; MVP 3, 4, 13.
 - Fixtures cover nested agents, unlinked agents, missing timestamps, incomplete status, cycles and parent aggregate counters.
 - Conversation mentions alone create neither skill usage nor agents.
 - Hierarchy metrics and token shares reconcile with task 03; missing relationships or durations remain visibly unknown.
+
+## Decisions and validation evidence
+
+- Each observed session/thread is an agent; explicit nested thread-spawn metadata supplies parent, role and nickname. Explicit `collab_agent_spawn` sender/receiver IDs may also establish a link. Missing parents, conflicting links, cycles and unobserved linked threads are reported without inventing agents or links. Unconnected observed threads remain separate.
+- Observed first/last timestamps retain event references; only an explicit `agent_completed` record with valid start and end timestamps supplies a verified interval. Missing status and intervals remain unknown. Only explicit `skill_invoked` records with a skill name are treated as skill evidence; conversation text is not interpreted. These supported coordination and skill event shapes are conservative and were not confirmed in the sampled local files; additional formats remain unsupported.
+- Per-agent token totals and cache percentages reuse task 03. Parent counters may include child usage, so main/subagent share remains unknown. Nested subagent sums are withheld when related counter streams could overlap, and missing child streams mark totals partial. Depth counts edges from the selected root; unlinked threads are excluded from its participating count.
+- Inline synthetic checks passed for nested agents, unlinked and missing-parent threads, cycles, missing event timestamps, observed and verified intervals, explicit skill evidence and ignored conversation mentions. Parser and agent modules compiled. Independent review pending.
+
