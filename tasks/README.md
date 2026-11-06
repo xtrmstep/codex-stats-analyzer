@@ -2,7 +2,7 @@
 
 Source of truth: [Codex Usage Analyzer specification](../specification/codex-usage-analyzer.md), preserved as supplied on 2026-11-06.
 
-Progress: Tasks 01–05 are complete and independently reviewed (`73423bc`, `5d37459`, `09e91a3`, `a57b35c`, `357acd8`); Task 06 is active; Tasks 07–14 are not started. Task numbers give the recommended execution order. Dependencies are prerequisites, and each task includes concrete completion checks.
+Progress: Tasks 01–06 are implemented and independently reviewed (`73423bc`, `5d37459`, `09e91a3`, `a57b35c`, `357acd8`, `9175775`); Task 07 is active; Tasks 08–14 are not started. Interactive browser/offline asset validation remains for task 14. Task numbers give the recommended execution order. Dependencies are prerequisites, and each task includes concrete completion checks.
 
 Execution override: the user authorized local-only Git work while no remote is available. Each task branch builds on the preceding reviewed task; remote discovery and pushes are deferred.
 

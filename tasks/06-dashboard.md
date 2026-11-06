@@ -1,10 +1,12 @@
 # 06 — Overview and session analysis UI
 
-Status: Implementation complete; independent review pending | Phase: 1 | Dependencies: 05
+Status: Complete; independent code review passed | Phase: 1 | Dependencies: 05
 
 Specification: §§4, 6; MVP 4, 7, 13.
 
 ## Scope
+
+Review: independent Astra review passed at `9175775`; mixed timestamps, filtered activity, and unrelated skill exclusion checked. Interactive browser/offline asset validation remains for task 14.
 
 - Create a Streamlit overview with global filters and available KPIs; add run-related controls and KPIs in task 10.
 - Render Plotly token trends at daily/weekly/monthly resolution, project/model/session breakdowns, cached versus non-cached input, and main versus subagent usage.
