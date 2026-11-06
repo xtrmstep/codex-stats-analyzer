@@ -137,6 +137,8 @@ def summarize(frame: pd.DataFrame, events: list[Event]) -> Metrics:
         totals = {name: Total(None, False) for name in totals}
     elif set(frame["session"].dropna()) - set(usage_frame["session"].dropna()):
         totals = {name: Total(total.value, False) for name, total in totals.items()}
+    if frame.attrs.get("run_filter"):
+        totals = {name: Total(total.value, False) for name, total in totals.items()}
     refs = tuple(dict.fromkeys(frame["reference"].tolist()))
     manual_provenance = ("manual classification filters",) if frame.attrs.get("manual_filter") else ()
     return Metrics(totals, frame["session"].nunique(), frame["agent"].nunique(),
@@ -167,6 +169,7 @@ def time_buckets(frame: pd.DataFrame, events: list[Event], frequency: str) -> li
         dated["bucket"] = pd.to_datetime(day.dt.strftime("%Y-%m-01"), utc=True, errors="coerce")
     return [(None if pd.isna(key) else key, summarize(group, events))
             for key, group in dated.groupby("bucket", dropna=False, sort=True)]
+
 
 
 
