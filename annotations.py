@@ -9,6 +9,7 @@ import tempfile
 from typing import Any
 
 from runs import validate_run
+from experiment_store import validate_experiment
 
 SCHEMA_VERSION = 1
 
@@ -75,8 +76,10 @@ def _validate(data: Any, kind: str) -> None:
                 raise StorageError(f"Invalid run: {exc}") from exc
     else:
         for experiment in data["experiments"]:
-            if not isinstance(experiment.get("groups"), list) or not isinstance(experiment.get("metrics"), list):
-                raise StorageError("Each experiment needs groups and metrics lists.")
+            try:
+                validate_experiment(experiment)
+            except ValueError as exc:
+                raise StorageError(f"Invalid experiment: {exc}") from exc
     try:
         json.dumps(data, ensure_ascii=False, allow_nan=False).encode("utf-8")
     except (TypeError, ValueError, UnicodeEncodeError) as exc:
@@ -193,6 +196,7 @@ def missing_sessions(snapshot: Snapshot, available_session_ids: set[str]) -> set
     references = {run["session_id"] for run in snapshot.data.get("runs", [])}
     references.update(item["target_id"] for item in snapshot.data.get("assignments", []) if item["target_type"] == "session")
     return references - available_session_ids
+
 
 
 

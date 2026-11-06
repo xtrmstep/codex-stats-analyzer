@@ -15,6 +15,7 @@ from annotations import MetadataStore, StorageError
 from labels_ui import manage
 from labels import assigned, matches, run_labels
 from run_ui import manage_runs, select_runs, run_summary
+from experiment_ui import render_experiments
 
 
 def _display(total, suffix=""):
@@ -180,6 +181,8 @@ def render(sources):
         if session_ids:
             root = st.selectbox("Session detail", session_ids)
             details(root, selected, parsed.events, accounting.increments, use_dates)
+    if snapshot is not None:
+        render_experiments(snapshot.data, parsed.events, accounting.increments, selected, selection, selected_agent, chosen_runs)
     with st.expander(f"Parsing and accounting diagnostics ({len(parsed.diagnostics) + len(accounting.diagnostics)})"):
         for item in parsed.diagnostics:
             st.write(f"{item.source}:{item.line or '-'} — {item.message}")
@@ -260,6 +263,7 @@ def details(root, selected, events, increments, date_filter_active=False):
         with st.expander("Hierarchy limitations"):
             for item in hierarchy.diagnostics:
                 st.write(item)
+
 
 
 
