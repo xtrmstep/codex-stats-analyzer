@@ -68,10 +68,9 @@ def main() -> None:
     except ValueError as exc:
         st.error(f"Configuration error: {exc} Edit config.toml and restart the application.")
         return
-    st.info("The application foundation is ready. Session analytics will be added in later tasks.")
-    st.write("Configured session directories:")
-    for source in sources:
-        st.code(str(source))
+    from dashboard import render
+
+    render(sources)
 
 
 if __name__ == "__main__":
@@ -84,3 +83,4 @@ if __name__ == "__main__":
             sys.exit(1)
     else:
         main()
+

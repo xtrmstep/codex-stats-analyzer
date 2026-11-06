@@ -1,6 +1,6 @@
 # 06 — Overview and session analysis UI
 
-Status: Not started | Phase: 1 | Dependencies: 05
+Status: Implementation complete; independent review pending | Phase: 1 | Dependencies: 05
 
 Specification: §§4, 6; MVP 4, 7, 13.
 
@@ -17,3 +17,9 @@ Specification: §§4, 6; MVP 4, 7, 13.
 - With a known fixture dataset, chart totals, table totals and KPIs agree under each supported filter.
 - Verify main-only, nested-agent, unlinked-agent, empty and partial-data views.
 - Check interactive charts render offline and display observed facts and estimates with clear labels.
+
+## Decisions and validation evidence
+
+- The overview and session detail use task 05 filters and shared summaries for KPIs, breakdowns, time buckets and agent usage. UTC date controls, project/model/session/role selections and a selected-agent control intersect. Session hierarchy and activity spans show full evidence as context; usage metrics and charts follow active filters. Unknown and partial amounts are labeled, and main/subagent figures are not added when scope may overlap.
+- Inline synthetic rendering with a Streamlit stub exercised populated and empty sources, partial and unknown token KPIs, Plotly chart construction, and a project-filtered KPI/session table reconciliation. Python modules compiled. The Streamlit AppTest attempt stalled in this sandbox and was interrupted; interactive browser rendering, full filter interaction, offline browser assets, and synthetic nested-agent timeline presentation remain unverified. Independent review pending.
+
