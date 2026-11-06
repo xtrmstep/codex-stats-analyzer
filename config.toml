@@ -1,0 +1,6 @@
+[sources]
+directories = [
+    '%USERPROFILE%\.codex\sessions',
+    '%USERPROFILE%\.codex\archived_sessions',
+    # Add more directories here, using TOML literal strings for Windows paths.
+]
