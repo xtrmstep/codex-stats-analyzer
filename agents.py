@@ -211,12 +211,19 @@ def analyze_agents(root_id: str, events: list[Event], increments: list[Increment
     main = agents[root_id].tokens if root_id in agents else Total(None, False)
     child_ids = set(depths) - {root_id}
     child_increments = [i for i in increments if i.session_id in child_ids]
-    nested_streams = any(
-        agents[child].parent_id in child_ids
-        and any(i.session_id == child for i in child_increments)
-        and any(i.session_id == agents[child].parent_id for i in child_increments)
-        for child in child_ids
-    )
+    stream_ids = {increment.session_id for increment in child_increments}
+    nested_streams = False
+    for child in stream_ids:
+        ancestor = agents[child].parent_id
+        visited = {child}
+        while ancestor in child_ids and ancestor not in visited:
+            if ancestor in stream_ids:
+                nested_streams = True
+                break
+            visited.add(ancestor)
+            ancestor = agents[ancestor].parent_id
+        if nested_streams:
+            break
     sub = (Total(None, False) if nested_streams else
            aggregate(child_increments)["total_tokens"] if child_ids else Total(None, False))
     if nested_streams:
@@ -228,6 +235,7 @@ def analyze_agents(root_id: str, events: list[Event], increments: list[Increment
     share = Total(None, False)
     return AgentAnalysis(agents, children, unlinked, len(depths), max(depths.values()) if depths else None,
                          main, sub, share, skills, diagnostics)
+
 
 
 
