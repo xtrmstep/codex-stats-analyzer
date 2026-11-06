@@ -2,7 +2,7 @@
 
 Source of truth: [Codex Usage Analyzer specification](../specification/codex-usage-analyzer.md), preserved as supplied on 2026-11-06.
 
-Progress: Task 01 is complete and independently reviewed (`73423bc`); Task 02 is active; Tasks 03–14 are not started. Task numbers give the recommended execution order. Dependencies are prerequisites, and each task includes concrete completion checks.
+Progress: Tasks 01–02 are complete and independently reviewed (`73423bc`, `5d37459`); Task 03 is active; Tasks 04–14 are not started. Task numbers give the recommended execution order. Dependencies are prerequisites, and each task includes concrete completion checks.
 
 Execution override: the user authorized local-only Git work while no remote is available. Each task branch builds on the preceding reviewed task; remote discovery and pushes are deferred.
 
