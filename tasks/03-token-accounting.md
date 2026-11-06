@@ -1,6 +1,6 @@
 # 03 — Token increments and trustworthy totals
 
-Status: Not started | Phase: 1 | Dependencies: 02
+Status: Implementation complete; independent review pending | Phase: 1 | Dependencies: 02
 
 Specification: §3.3; MVP 2, 13.
 
@@ -18,3 +18,11 @@ Specification: §3.3; MVP 2, 13.
 - Hand-calculated fixtures verify counter deltas, resets, duplicates, missing fields, changing models, and nested-agent rollups.
 - Unknown values remain unknown rather than becoming zero; negative or inconsistent counters produce diagnostics.
 - Session totals and disjoint agent/model totals reconcile where source coverage permits. Partial totals are marked as partial.
+
+## Decisions and validation evidence
+
+- Sampled only key shapes in local files: both event-message total and thread-usage cumulative records contain input, cached input, output, reasoning output and total counters. Prefer event-message totals per session where present, otherwise thread totals; their overlap is unverified, so never add the two families. Per-response and last-usage counters are not added independently.
+- The first observed cumulative snapshot is a partial baseline from zero. Repeated counters produce zero increments, duplicate references are ignored, timestamp regressions are excluded, and counter decreases start a partial reset epoch. Missing, invalid and inconsistent values stay unknown or partial. Input includes cached input; output includes reasoning output; neither child is added to its parent. Non-cached input is the difference. Cache percentage uses paired eligible summed counters and is unknown for zero input.
+- A counter is timestamped at observation, not exact usage time. Model context carries forward, but first snapshots and deltas crossing a model change have unknown model attribution. Session ID is the fallback agent identity. Parent and child streams are not summed when their relationship is known because counter inclusion is unresolved; the combined aggregate is unknown. Full scope and hierarchy reconciliation require later evidence; partial totals do not imply complete coverage.
+- Inline hand-calculated synthetic checks passed for deltas, duplicates, reset, invalid fields, timestamp regression, model change, eligible cache ratio, and unresolved parent-child aggregation. Python compilation passed. Independent review pending.
+
