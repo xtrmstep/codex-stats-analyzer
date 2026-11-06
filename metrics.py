@@ -44,20 +44,28 @@ _COLUMNS = ("reference", "session", "agent", "parent", "project", "model", "agen
 def build_dataset(events: list[Event], increments: list[Increment]) -> pd.DataFrame:
     """Attach explicitly observed session and agent context to increments.
 
-    Project and role context carry forward within each session. References keep
+    Observed event rows retain entities even without counters. Project, role and
+    model context carry forward within each session. References keep
     the original accounting event available for provenance. Unknown model
     attribution from accounting is never replaced by contextual model values.
     """
     contexts: dict[str, dict[str, str | None]] = {}
     context_by_reference: dict[str, dict[str, str | None]] = {}
+    rows = []
     for event in events:
-        context = contexts.setdefault(event.session_id, {"project": None, "agent_role": None})
+        context = contexts.setdefault(event.session_id, {"project": None, "agent_role": None, "model": None})
         if event.project_path:
             context["project"] = event.project_path
         if event.agent_role:
             context["agent_role"] = event.agent_role
+        if event.model:
+            context["model"] = event.model
         context_by_reference[event.reference] = context.copy()
-    rows = []
+        rows.append({"reference": event.reference, "session": event.session_id,
+                     "agent": event.session_id, "parent": event.parent_agent_id,
+                     "project": context["project"], "model": context["model"],
+                     "agent_role": context["agent_role"], "timestamp": event.timestamp,
+                     "increment": None})
     for increment in increments:
         context = context_by_reference.get(increment.reference, {})
         rows.append({"reference": increment.reference, "session": increment.session_id,
@@ -107,14 +115,18 @@ def _overlapping_streams(frame: pd.DataFrame, events: list[Event]) -> bool:
 
 def summarize(frame: pd.DataFrame, events: list[Event]) -> Metrics:
     """Aggregate once for every view; withhold related streams with unknown overlap."""
-    increments = list(frame["increment"])
+    increments = [increment for increment in frame["increment"] if increment is not None]
     totals = aggregate(increments)
-    if _overlapping_streams(frame, events):
+    usage_frame = frame.loc[frame["increment"].notna()]
+    if _overlapping_streams(usage_frame, events):
         totals = {name: Total(None, False) for name in totals}
+    elif set(frame["session"].dropna()) - set(usage_frame["session"].dropna()):
+        totals = {name: Total(total.value, False) for name, total in totals.items()}
     refs = tuple(dict.fromkeys(frame["reference"].tolist()))
     return Metrics(totals, frame["session"].nunique(), frame["agent"].nunique(),
                    Total(None, False), refs,
-                   ("observed counters", "estimated timing within counter intervals") if increments else ())
+                   (("observed events", "observed counters", "estimated timing within counter intervals")
+                    if increments else ("observed events",) if not frame.empty else ()))
 
 
 def grouped(frame: pd.DataFrame, events: list[Event], dimension: str) -> list[tuple[object, Metrics]]:
@@ -139,4 +151,7 @@ def time_buckets(frame: pd.DataFrame, events: list[Event], frequency: str) -> li
         dated["bucket"] = pd.to_datetime(day.dt.strftime("%Y-%m-01"), utc=True, errors="coerce")
     return [(None if pd.isna(key) else key, summarize(group, events))
             for key, group in dated.groupby("bucket", dropna=False, sort=True)]
+
+
+
 
