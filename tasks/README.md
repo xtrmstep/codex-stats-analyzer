@@ -2,7 +2,9 @@
 
 Source of truth: [Codex Usage Analyzer specification](../specification/codex-usage-analyzer.md), preserved as supplied on 2026-11-06.
 
-All tasks are **Not started**. This plan records implementation work; no application code has been implemented. Task numbers give the recommended execution order. Dependencies are prerequisites, and each task includes concrete completion checks.
+Progress: Task 01 is complete and independently reviewed (`73423bc`); Task 02 is active; Tasks 03–14 are not started. Task numbers give the recommended execution order. Dependencies are prerequisites, and each task includes concrete completion checks.
+
+Execution override: the user authorized local-only Git work while no remote is available. Each task branch builds on the preceding reviewed task; remote discovery and pushes are deferred.
 
 Keep the application small: Python, Streamlit, pandas, Plotly, JSON/JSONL, and local files. Do not introduce external databases, plugin frameworks, distributed components, or background services. Runtime must work offline without authentication; installation may download dependencies. Document an offline installation path using locally supplied dependencies.
 

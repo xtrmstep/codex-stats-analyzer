@@ -1,6 +1,6 @@
 # 01 — Application foundation and Windows launchers
 
-Status: Implementation complete; independent review pending | Phase: 1 | Dependencies: None
+Status: Complete; independent review passed | Phase: 1 | Dependencies: None
 
 Specification: §§1, 8, 9, 11.
 
@@ -25,5 +25,5 @@ Specification: §§1, 8, 9, 11.
 - Python 3.12 compiled the four modules; `app.py --check-config` expanded both default paths, and an empty directory list produced an actionable error.
 - `run.bat` started Streamlit on localhost:8501; the local health endpoint returned `ok`. Effective configuration reported localhost, port 8501, telemetry disabled, and the first-run email prompt disabled.
 - Offline wheelhouse installation, launch from a path containing spaces, and an offline browser session have not been exercised.
-- Independent review remains pending.
+- Independent Astra review of commit `73423bc` passed with no blocking findings. Reviewer also verified syntax, dependency imports, and configuration. Extra EOF blank lines were noted as nonblocking.
 
