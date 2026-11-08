@@ -17,7 +17,6 @@ from labels import assigned, matches, run_labels
 from run_ui import manage_runs, select_runs, run_summary
 from experiment_ui import render_experiments
 from exports import csv_bytes, SESSION_COLUMNS, RUN_COLUMNS
-from refresh import source_manifest, changes
 from runs import calculate_run
 
 
@@ -50,14 +49,6 @@ def _chart_rows(groups):
 def render(sources):
     """Render the overview and selected session from local read-only sources."""
     refresh_requested = st.sidebar.button("Refresh sources")
-    manifest_key = "source_manifest"
-    if refresh_requested or manifest_key not in st.session_state:
-        manifest, fingerprint_diagnostics = source_manifest(sources)
-        previous = st.session_state.get(manifest_key)
-        if refresh_requested and previous is not None:
-            st.session_state["source_changes"] = changes(previous, manifest)
-        st.session_state[manifest_key] = manifest
-        st.session_state["fingerprint_diagnostics"] = fingerprint_diagnostics
     parsed = ingest(sources)
     accounting = calculate_increments(parsed.events)
     frame = build_dataset(parsed.events, accounting.increments)
@@ -70,15 +61,6 @@ def render(sources):
     if snapshot is not None:
         manage(store, snapshot, sorted(frame["session"].dropna().unique().tolist()))
         manage_runs(store, snapshot, parsed.events, accounting.increments)
-    if refresh_requested:
-        report = st.session_state.get("source_changes", {"new": [], "changed": [], "missing": []})
-        st.info(f"Refresh: {len(report['new'])} new, {len(report['changed'])} changed, {len(report['missing'])} unavailable or moved source files. All analytics and saved comparisons are recalculated.")
-        with st.expander("Source changes"):
-            for kind, paths in report.items():
-                for path in paths:
-                    st.write(f"{kind}: {path}")
-        for diagnostic in st.session_state.get("fingerprint_diagnostics", []):
-            st.warning(str(diagnostic))
     if snapshot is not None:
         missing = missing_sessions(snapshot, {event.session_id for event in parsed.events})
         if missing:
