@@ -15,11 +15,10 @@ specification/
 │
 ├── 01-screens/
 │   ├── 000-screen-guidelines.md       — conventions for screen specifications
-│   └── codex-usage-analyzer/          — UI screen specifications
-│       ├── 000-main-layout.md
-│       ├── 010-navigation.md
-│       ├── 020-header.md
-│       └── 030-content.md
+│   ├── 000-main-layout.md             — application shell and regions
+│   ├── 010-navigation.md
+│   ├── 020-header.md
+│   └── 030-content.md
 │
 ├── 02-architecture/
 │   ├── 01-guidelines/                 — engineering and documentation conventions
@@ -37,7 +36,7 @@ specification/
 ## Navigation
 
 - **Product requirements:** start with [codex-usage-analyzer.md](./codex-usage-analyzer.md).
-- **UI behavior:** read [01-screens/000-screen-guidelines.md](./01-screens/000-screen-guidelines.md), then the relevant screen documents in [01-screens/codex-usage-analyzer/](./01-screens/codex-usage-analyzer/).
+- **UI behavior:** read [01-screens/000-screen-guidelines.md](./01-screens/000-screen-guidelines.md), then the relevant screen documents in [01-screens/](./01-screens/).
 - **Engineering conventions:** read the applicable guideline in [02-architecture/01-guidelines/](./02-architecture/01-guidelines/).
 - **Interface contracts:** read [03-contracts/010-contract-guidelines.md](./03-contracts/010-contract-guidelines.md).
 
