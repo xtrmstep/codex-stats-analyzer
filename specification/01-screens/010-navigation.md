@@ -14,7 +14,7 @@ This document defines the simplified navigation model for the current product sc
 +---------------------------------------------------------------+
 ```
 
-The sketch is a simplified model for the app shell shown in [00-layout.md](./00-layout.md) (`0.1`). It represents the full current scope of the application.
+The sketch is a simplified model for the app shell shown in [000-main-layout.md](./000-main-layout.md) (`0.1`). It represents the full current scope of the application.
 
 ## 1.2 Supported sections
 
@@ -30,7 +30,7 @@ This section allows users to create manual events and configure how those events
 
 ### 1.3.1 Selection behavior
 
-Selecting a navigation item changes the primary content area described in [03-content.md](./03-content.md) (`3.x`). The application does not define any additional nested navigation hierarchy beyond these two views.
+Selecting a navigation item changes the primary content area described in [030-content.md](./030-content.md) (`3.x`). The application does not define any additional nested navigation hierarchy beyond these two views.
 
 ### 1.3.2 Minimal page model
 

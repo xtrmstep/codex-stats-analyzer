@@ -1,6 +1,6 @@
 # Header
 
-This document describes the minimal header region for the application shell shown in [00-layout.md](./00-layout.md) (`0.2`). The product scope currently includes overview analytics and manual annotations, without any run or label system.
+This document describes the minimal header region for the application shell shown in [000-main-layout.md](./000-main-layout.md) (`0.2`). The product scope currently includes overview analytics and manual annotations, without any run or label system.
 
 ## 2.1 Header sketch
 

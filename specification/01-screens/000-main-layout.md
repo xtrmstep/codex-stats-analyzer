@@ -24,23 +24,23 @@ The application is organized into three primary regions:
 
 The page shell is a conceptual reference for the simplified UI. Detailed behavior for each region is defined in the related documents:
 
-- Navigation: [01-navigation.md](./01-navigation.md) (`1.x`)
-- Header: [02-header.md](./02-header.md) (`2.x`)
-- Content: [03-content.md](./03-content.md) (`3.x`)
+- Navigation: [010-navigation.md](./010-navigation.md) (`1.x`)
+- Header: [020-header.md](./020-header.md) (`2.x`)
+- Content: [030-content.md](./030-content.md) (`3.x`)
 
 ## 0.2 Region responsibilities
 
 ### 0.2.1 Navigation region
 
-The navigation region is the persistent side area for the two supported views: overview and manual annotations. This is documented in [01-navigation.md](./01-navigation.md).
+The navigation region is the persistent side area for the two supported views: overview and manual annotations. This is documented in [010-navigation.md](./010-navigation.md).
 
 ### 0.2.2 Header region
 
-The header region contains the active page context and the supported global filters. It is described in [02-header.md](./02-header.md). No additional header controls are assumed unless they are explicitly added later.
+The header region contains the active page context and the supported global filters. It is described in [020-header.md](./020-header.md). No additional header controls are assumed unless they are explicitly added later.
 
 ### 0.2.3 Main content region
 
-The main content region contains the currently selected page body. This includes overview analytics and manual annotation configuration. It is described in [03-content.md](./03-content.md).
+The main content region contains the currently selected page body. This includes overview analytics and manual annotation configuration. It is described in [030-content.md](./030-content.md).
 
 ## 0.3 Unresolved details
 

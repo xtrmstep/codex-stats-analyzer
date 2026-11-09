@@ -25,7 +25,7 @@ This document defines the minimal content area for the two supported application
 +--------------------------------------------------------------------------+
 ```
 
-This conceptual layout corresponds to the main content region in [00-layout.md](./00-layout.md) (`0.3`).
+This conceptual layout corresponds to the main content region in [000-main-layout.md](./000-main-layout.md) (`0.3`).
 
 ## 3.2 Content responsibilities
 
