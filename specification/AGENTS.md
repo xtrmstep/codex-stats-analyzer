@@ -30,7 +30,7 @@ specification/
 │   └── 02-design/                     — reserved for future architecture design documents
 │
 └── 03-contracts/
-    └── 010-contract-guidelines.md     — conventions for contract specifications
+    └── AGENTS.md                      — conventions for contract specifications
 ```
 
 ## Navigation
@@ -38,7 +38,7 @@ specification/
 - **Product requirements:** start with [codex-usage-analyzer.md](./codex-usage-analyzer.md).
 - **UI behavior:** read [01-screens/AGENTS.md](./01-screens/AGENTS.md), then the relevant screen documents in [01-screens/](./01-screens/).
 - **Engineering conventions:** read the applicable guideline in [02-architecture/01-guidelines/](./02-architecture/01-guidelines/).
-- **Interface contracts:** read [03-contracts/010-contract-guidelines.md](./03-contracts/010-contract-guidelines.md).
+- **Interface contracts:** read [03-contracts/AGENTS.md](./03-contracts/AGENTS.md).
 
 ## Document conventions
 
