@@ -1,6 +1,6 @@
 # Navigation
 
-This document defines the minimal navigation structure implied by the functional specification for the dashboard and annotation workflows. It intentionally avoids inventing exact labels or styling beyond the supported conceptual sections.
+This document defines the simplified navigation model for the current product scope. The system contains only two top-level views: an overview and a manual annotations page.
 
 ## 1.1 Navigation sketch
 
@@ -8,56 +8,40 @@ This document defines the minimal navigation structure implied by the functional
 +---------------------------------------------------------------+
 | [1.1] Navigation                                              |
 |                                                               |
-|  1.1.1 Overview / Dashboard                                   |
-|  1.1.2 Sessions / Agent detail                               |
-|  1.1.3 Runs / Metrics                                         |
-|  1.1.4 Labels / Filtering                                     |
-|  1.1.5 Manual annotations / Metadata                          |
+|  1.1.1 Overview                                              |
+|  1.1.2 Manual annotations                                    |
 |                                                               |
 +---------------------------------------------------------------+
 ```
 
-The sketch is a simplified model for the app shell shown in [00-general-layout.md](./00-general-layout.md) (`0.1`). It represents the functional areas that are explicitly supported by the existing specification.
+The sketch is a simplified model for the app shell shown in [00-layout.md](./00-layout.md) (`0.1`). It represents the full current scope of the application.
 
 ## 1.2 Supported sections
 
-### 1.2.1 Overview / dashboard
+### 1.2.1 Overview
 
-This section corresponds to the BI dashboard requirements in the primary specification, especially the global filters and overview KPIs. The dashboard is the default high-level entry point for aggregate analysis.
+This section presents the aggregated statistics for the selected time range and filters. It is the default landing view for high-level analysis.
 
-### 1.2.2 Sessions / agent detail
+### 1.2.2 Manual annotations
 
-This section represents the direct analysis of sessions and their token/accounting details, including agent hierarchy and execution timeline views. The primary specification calls for session-level metrics, agent-role analysis, and timeline interpretation.
-
-### 1.2.3 Runs / metrics
-
-This section covers run-level usage and interval analysis, including created runs, annotations, and metric calculation for selected time ranges.
-
-### 1.2.4 Labels / filtering
-
-This section represents label management and filter-driven analysis. The specification explicitly requires creating, editing, deleting, assigning, and filtering labels across sessions and runs.
-
-### 1.2.5 Manual annotations / metadata
-
-This section represents run creation and metadata editing, including names, descriptions, labels, task identifiers, task type, outcome, scoring, and notes.
+This section allows users to create manual events and configure how those events contribute to aggregate stats. The user can define whether an event should include all stats or only selected chats, along with other event-level configuration.
 
 ## 1.3 Navigation behavior
 
 ### 1.3.1 Selection behavior
 
-Selecting a navigation item changes the page or panel shown in the main content region described in [03-content.md](./03-content.md) (`3.x`). The specification requires that dashboard visualizations respond to selected filters, but it does not define a separate navigation mode or routing model.
+Selecting a navigation item changes the primary content area described in [03-content.md](./03-content.md) (`3.x`). The application does not define any additional nested navigation hierarchy beyond these two views.
 
-### 1.3.2 Hierarchy of views
+### 1.3.2 Minimal page model
 
-The navigation model is intentionally shallow. The supported specification points to dashboard-level summaries and detail-level analyses, but does not define further nested menus or page trees.
+The current product scope is intentionally shallow. There are no run pages, no labels system, and no dashboard sub-navigation beyond the two supported top-level views.
 
 ## 1.4 Unresolved details
 
-The specification does not confirm:
+The current scope does not confirm:
 
 - exact menu naming or iconography
-- whether sections are accordion-based or static
-- whether a collapsible side rail is part of the UI
-- whether the left navigation persists on all screens or only in dashboard context
+- whether the navigation is static or collapsible
+- whether the manual annotations mode is displayed as a dedicated page or a modal form
 
-These are intentionally left open for a later UI specification pass.
+These remain open for later UI specification work.

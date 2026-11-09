@@ -1,64 +1,40 @@
 # Header
 
-This document describes the minimal header region for the application shell shown in [00-general-layout.md](./00-general-layout.md) (`0.2`). It is limited to elements explicitly supported by the existing specification.
+This document describes the minimal header region for the application shell shown in [00-layout.md](./00-layout.md) (`0.2`). The product scope currently includes overview analytics and manual annotations, without any run or label system.
 
 ## 2.1 Header sketch
 
 ```text
-+----------------------------------------------------------------------------------+
-| [2.1] Page title / current context                                              |
-|                                                                                  |
-| [2.2] Global filters                                                            |
-|   - date range                                                                   |
-|   - project                                                                      |
-|   - model                                                                        |
-|   - session                                                                      |
-|   - agent role                                                                   |
-|   - labels                                                                       |
-|   - task type                                                                    |
-|   - execution mode                                                               |
-+----------------------------------------------------------------------------------+
++---------------------------------------------------------------+
+| [2.1] System title                                            |
+| [2.2] Date range: All Time                                    |
++---------------------------------------------------------------+
 ```
 
 This is a conceptual header and does not imply any specific visual style or component library.
 
 ## 2.2 Header elements
 
-### 2.2.1 Page title and context
+### 2.2.1 System title
 
-The header indicates the current page or analytic context. The specification names its purpose only indirectly by referring to dashboard views and annotations; it does not define an explicit title taxonomy for every page.
+The header displays the system title only. It does not display page context or additional actions in the current simplified scope.
 
-### 2.2.2 Global filters
+### 2.2.2 Date range
 
-The primary specification defines the supported global filters in section `6.1`:
-
-- `2.2.2.1` date range
-- `2.2.2.2` project
-- `2.2.2.3` model
-- `2.2.2.4` session
-- `2.2.2.5` agent role
-- `2.2.2.6` labels
-- `2.2.2.7` task type
-- `2.2.2.8` execution mode
-
-These filters are global in the sense that all dashboard visualizations respond to them.
+The header displays the date range selector, which defaults to `All Time` and is already understood to work correctly. No additional date-range specification is required here.
 
 ## 2.3 Header behavior
 
-### 2.3.1 Filter-driven updates
+### 2.3.1 Minimal state
 
-Changing a filter updates the dashboard and associated content in the main area. This behavior is explicitly required by the specification: all dashboard visualizations respond to selected filters.
-
-### 2.3.2 Context preservation
-
-The header should preserve the active analytic context while the user changes filters or navigates between related views. The specification does not define a separate breadcrumb or persistent state mechanism.
+The header remains minimal and stable. There are no filter controls beyond the date range, and no page-specific context is shown in the header.
 
 ## 2.4 Unresolved details
 
-The specification does not confirm:
+The current scope does not confirm:
 
-- whether filters are presented as dropdowns, chips, or a form
-- whether the header includes search, actions, or status indicators
-- whether the page title is always shown or only on certain views
+- whether the system title is rendered as text or a logo
+- whether the date range control is presented as a dropdown, button, or compact selector
+- whether future versions may add additional header controls
 
-These elements remain unresolved and should be specified later.
+These remain open for later UI specification work.

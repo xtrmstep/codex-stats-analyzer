@@ -1,81 +1,93 @@
 # Content area
 
-This document defines the minimal content-area structure implied by the BI dashboard and annotation workflows in the primary specification. It intentionally defers page-specific layouts and individual widgets.
+This document defines the minimal content area for the two supported application views: overview and manual annotations. It intentionally defers detailed page layouts and individual widgets.
 
 ## 3.1 Content sketch
 
 ```text
 +--------------------------------------------------------------------------+
-| [3.1] Overview / KPI summary                                            |
-|   - total tokens                                                        |
-|   - input/output distribution                                           |
-|   - cache percentage                                                    |
-|   - sessions / runs / agents                                             |
-|   - average and median tokens per run                                    |
-|   - subagent token share                                                |
+| [3.1] View Parameters / View Configuration                                |
+|   - additional filters                                                    |
+|   - manual annotations / events filters                                   |
+|   - dimension selection                                                   |
+|   - grouping selection                                                    |
+|   - sorting selection                                                     |
 +--------------------------------------------------------------------------+
-| [3.2] Visualizations                                                    |
-|   - token usage over time                                               |
-|   - token consumption by project/model/session/run/label                 |
-|   - cached vs. non-cached input distribution                            |
-|   - main-agent vs. subagent token consumption                           |
-|   - agent hierarchy and execution timeline                               |
-+--------------------------------------------------------------------------+
-| [3.3] Detail table                                                      |
-|   - detailed sessions and runs                                          |
-|   - filtered records                                                    |
+| [3.2] Metrics                                                            |
+|   - Overview KPIs                                                         |
+|       - total input tokens                                                |
+|       - total output tokens                                               |
+|       - processing speed                                                  |
+|       - other summary indicators                                          |
+|   - Trends and charts                                                     |
+|       - hourly and daily trend over time                                   |
+|       - breakdown by selected view parameters                             |
 +--------------------------------------------------------------------------+
 ```
 
-This conceptual layout corresponds to the main content region in [00-general-layout.md](./00-general-layout.md) (`0.3`).
+This conceptual layout corresponds to the main content region in [00-layout.md](./00-layout.md) (`0.3`).
 
 ## 3.2 Content responsibilities
 
-### 3.2.1 KPI summary
+### 3.2.1 View Parameters / View Configuration
 
-The top of the content area is reserved for overview KPIs. The primary specification enumerates the supported metrics in section `6.2`:
+The first block is dedicated to defining how data is viewed. The user can configure:
 
-- `3.2.1.1` total tokens
-- `3.2.1.2` input/output token distribution
-- `3.2.1.3` cache percentage
-- `3.2.1.4` sessions
-- `3.2.1.5` runs
-- `3.2.1.6` agents
-- `3.2.1.7` average and median tokens per run
-- `3.2.1.8` subagent token share
+- `3.2.1.1` additional filters
+- `3.2.1.2` filtering by manual annotations or events
+- `3.2.1.3` dimension selection
+- `3.2.1.4` grouping criteria
+- `3.2.1.5` sorting criteria
 
-### 3.2.2 Visualizations
+These parameters determine the data slice being analyzed and should affect all metrics and chart output.
 
-The visualization area contains the dashboard charts and analysis views enumerated in section `6.3`:
+Manual annotations are treated as regular filtering parameters rather than a separate feature area. They extend the available filtering options for the current view.
 
-- `3.2.2.1` token usage over time with daily/weekly/monthly aggregation
-- `3.2.2.2` token consumption by project, model, session, run, or label
-- `3.2.2.3` cached versus non-cached input distribution
-- `3.2.2.4` main-agent versus subagent token consumption
-- `3.2.2.5` agent hierarchy and execution timeline
-- `3.2.2.6` detailed sessions and runs table
+### 3.2.2 Metrics
 
-### 3.2.3 Detail table
+The second block displays summary metrics and trend visualizations.
 
-The lower content area is reserved for records and drill-down results. The primary specification requires a table for detailed sessions and runs and implies that selected filters should narrow the table content.
+#### 3.2.2.1 Overview KPIs
+
+This section summarizes key indicators, including:
+
+- total input tokens
+- total output tokens
+- processing speed
+- additional relevant summary metrics
+
+#### 3.2.2.2 Trends and charts
+
+This section shows how metrics change over time, such as:
+
+- hourly and daily trends
+- grouped breakdowns based on the selected view parameters
+- chart output reflecting the chosen dimensions, grouping, and filters
 
 ## 3.3 Content behavior
 
-### 3.3.1 Filter reactivity
+### 3.3.1 Parameter-driven updates
 
-All dashboard visualizations respond to the selected filters from the header. This requirement is stated explicitly in the primary specification and should apply across KPI cards, chart sections, and the detail table.
+All metrics and charts update according to the selected view configuration. The current filtering choices, grouping, sorting, and manual-annotation filters should refresh the displayed KPI values and trend breakdowns.
 
-### 3.3.2 Scope of page layouts
+### 3.3.2 Scope boundaries
 
-This document intentionally does not define the layout for individual pages or dashboard widgets. The current specification does not provide enough detail to fix those designs without inventing unsupported behavior.
+This document intentionally does not define:
+
+- exact field layout within the configuration block
+- exact chart types beyond the trend and breakdown requirement
+- individual metric formulas beyond summary examples
+- a separate manual-annotations management surface
+
+The spec remains minimal until a later UI pass adds page-specific details.
 
 ## 3.4 Unresolved details
 
-The specification does not confirm:
+The current scope does not confirm:
 
-- exact widget arrangement within the content pane
-- whether the KPI summary is a row of cards, a grid, or a single stacked block
-- whether each visualization is an individual panel or a single combined dashboard
-- whether annotation workflows have dedicated page layouts separate from the dashboard
+- the exact values for grouping dimensions such as conversation, agent, or agent role
+- whether ordering is ascending, descending, or user-defined
+- how manual annotation filters are expressed in the UI
+- whether the configuration block is collapsible or always visible
 
-These should be specified later as page-by-page UI designs.
+These are intentionally deferred.
