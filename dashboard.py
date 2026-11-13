@@ -141,8 +141,9 @@ def render(sources):
     run_rows, run_mean, run_median = run_summary(run_matches, parsed.events, snapshot.data if snapshot else None)
     run_columns = st.columns(3)
     run_columns[0].metric("Runs", len(run_rows))
-    run_columns[1].metric("Average tokens per run", f"{run_mean:,.1f} (known only)" if run_mean is not None else "Unknown")
-    run_columns[2].metric("Median tokens per run", f"{run_median:,.1f} (known only)" if run_median is not None else "Unknown")
+    run_columns[1].metric("Average tokens per run", f"{run_mean:,.1f}" if run_mean is not None else "Unknown")
+    run_columns[2].metric("Median tokens per run", f"{run_median:,.1f}" if run_median is not None else "Unknown")
+    st.caption("Run averages and medians include known values only.")
     st.caption("Run totals cover root-thread counters only, may be partial, and exclude child usage. Overlapping runs and multiple labels are not additive.")
     if selected.empty:
         st.info("No observed events match the selected filters.")

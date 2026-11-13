@@ -61,7 +61,7 @@ def main() -> None:
     """Display the foundation screen or an actionable configuration error."""
     import streamlit as st
 
-    st.set_page_config(page_title="Codex Usage Analyzer")
+    st.set_page_config(page_title="Codex Usage Analyzer", layout="wide")
     st.title("Codex Usage Analyzer")
     try:
         sources = load_source_directories()

@@ -7,3 +7,7 @@ showEmailPrompt = false
 [browser]
 gatherUsageStats = false
 
+[theme]
+metricValueFontSize = "1.5rem"
+metricValueFontWeight = 400
+
