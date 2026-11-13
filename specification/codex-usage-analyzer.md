@@ -21,7 +21,7 @@ The application must work without Codex authentication, API access, external ser
 
 A Codex conversation identified by its session ID.
 
-A session can contain multiple user requests, execution phases, and agents.
+A session can contain multiple user requests, execution phases, and agent threads. A thread identifies an individual execution within a session. See the [backend data model](./02-architecture/02-design/000-system-overview.md#data-model) for attribution and identity rules.
 
 ### 2.2 Agent
 
@@ -109,19 +109,20 @@ Never treat mentions of a skill or subagent in ordinary conversation text as pro
 
 ### 3.3 Token accounting
 
-Calculate consumption from token counter increments.
+Calculate consumption from recorded response usage and supported legacy counter deltas. Apply the [import and accounting rules](./02-architecture/02-design/000-system-overview.md#import-and-accounting) before grouping or filtering usage.
 
 Track:
 
 - Total tokens
 - Input tokens
 - Cached input tokens
+- Cache-write input tokens, if available
 - Non-cached input tokens
 - Output tokens
 - Reasoning output tokens, if available
 - Cache percentage
 
-Support allocation by time, session, agent, model, and run.
+Support allocation by time, project, session, agent, model, and run.
 
 Ensure that hierarchical rollups do not double-count subagent usage.
 
@@ -160,8 +161,7 @@ For the complete session, additionally calculate:
 - Number of participating agents
 - Maximum hierarchy depth
 - Main agent token consumption
-- Combined subagent token consumption
-- Subagent share of total tokens
+- Combined subagent token consumption and subagent share where independent usage can be established
 
 ### 4.3 Execution timeline
 
@@ -220,6 +220,10 @@ Each run may include:
 
 Manual annotations persist across application restarts.
 
+### 5.4 Saved time markers
+
+Users can save, rename, change, and delete a named timestamp such as **Switched to multi-agent**. A marker is available across usage views and persists through application restarts and source rebuilds. Selecting it enables the second reporting window described under [Visualizations](#63-visualizations).
+
 ## 6. BI dashboard
 
 ### 6.1 Global filters
@@ -246,7 +250,8 @@ Display:
 - Runs
 - Agents
 - Average and median tokens per run
-- Subagent token share
+- Average tokens per day
+- Subagent token share where independent usage can be established
 
 ### 6.3 Visualizations
 
@@ -260,6 +265,12 @@ Provide:
 6. Detailed sessions and runs table.
 
 Support sorting, grouping, filtering, and CSV export.
+
+Support token usage by project over time, by agent over time, and by agent and project. Agent views can show individual threads or group executions by observed agent name or role. Include unclassified usage under unknown where attribution is unavailable and the usage can be counted safely.
+
+For each usage view, show metrics for the full selected time range and, when a marker is selected, a second set for the intersection of that range with the time starting at the marker. Both sets use the same project, agent, model, and other active filters. Include observations at the marker timestamp. When the intersection is empty, display **No time in range**. Flag uncertain attribution when a legacy delta spans the cutoff and use its observation time for placement.
+
+Compute average tokens per day over each window's elapsed duration in days, including days with no recorded usage when coverage is complete. Carry the total's coverage status into the average and leave the average unknown when the duration or token total is unavailable. Calculate cache percentage from eligible summed cached input and input tokens in each window.
 
 ## 7. Experiment comparison
 
@@ -321,35 +332,9 @@ Saved experiments can be reopened and recalculated when new runs become availabl
 
 ## 8. Data storage
 
-The application remains file-based.
+The [usage analytics backend](./02-architecture/02-design/000-system-overview.md) stores imported usage and saved time markers in local SQLite. Original Codex JSONL files are read-only. The usage dataset can be rebuilt while preserving user-authored data.
 
-Original Codex JSONL files are read-only.
-
-Store user-defined metadata separately:
-
-```text
-codex-usage-analyzer/
-├── app.py
-├── parser.py
-├── analytics.py
-├── annotations.py
-├── requirements.txt
-├── setup.bat
-├── run.bat
-├── config.toml
-├── data/
-│   ├── annotations.json
-│   └── experiments.json
-└── README.md
-```
-
-`annotations.json` contains run definitions, manual labels, and user metadata.
-
-`experiments.json` contains saved comparison configurations.
-
-Use stable session IDs and event identifiers for references.
-
-Save annotation files atomically to avoid corruption.
+Existing `annotations.json` and `experiments.json` files continue to hold their user-authored data. Preserve stable session and event references and save annotation files atomically.
 
 No external database or server is required.
 
@@ -359,7 +344,8 @@ No external database or server is required.
 - Streamlit — dashboard UI
 - pandas — data analysis
 - Plotly — interactive charts
-- JSON/JSONL — persistent storage
+- SQLite — imported usage and saved time markers
+- JSON/JSONL — existing user metadata and Codex log input
 
 The application runs locally on Windows and opens at `http://localhost:8501`.
 
@@ -382,6 +368,8 @@ Bind only to localhost and disable telemetry.
 11. Preserve original Codex files without modification.
 12. Work fully offline without Codex authentication.
 13. Clearly distinguish automatically observed facts, manual annotations, and estimated values.
+14. Reimporting identical Codex usage leaves totals unchanged. A failed import leaves the last successful dataset available.
+15. Project and agent usage views show both the selected-period metrics and the metrics since a saved time marker within that period.
 
 ## 11. Implementation priorities
 

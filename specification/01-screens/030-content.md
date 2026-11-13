@@ -8,7 +8,7 @@ This document defines the minimal content area for the two supported application
 +--------------------------------------------------------------------------+
 | [3.1] View Parameters / View Configuration                                |
 |   - additional filters                                                    |
-|   - manual annotations / events filters                                   |
+|   - manual annotations / events filters and saved time marker             |
 |   - dimension selection                                                   |
 |   - grouping selection                                                    |
 |   - sorting selection                                                     |
@@ -43,6 +43,8 @@ These parameters determine the data slice being analyzed and should affect all m
 
 Manual annotations are treated as regular filtering parameters rather than a separate feature area. They extend the available filtering options for the current view.
 
+The saved time marker selector enables the second metric scope defined in [Visualizations](../codex-usage-analyzer.md#63-visualizations). The existing filter selection applies to both scopes.
+
 ### 3.2.2 Metrics
 
 The second block displays summary metrics and trend visualizations.
@@ -55,6 +57,8 @@ This section summarizes key indicators, including:
 - total output tokens
 - processing speed
 - additional relevant summary metrics
+
+With a time marker selected, present **Full selected period** and **Since [marker name]** together. Identify the marker timestamp and the effective range so the user can interpret the two sets of values.
 
 #### 3.2.2.2 Trends and charts
 
