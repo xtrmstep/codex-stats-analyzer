@@ -332,7 +332,7 @@ Saved experiments can be reopened and recalculated when new runs become availabl
 
 ## 8. Data storage
 
-The [usage analytics backend](./02-architecture/02-design/000-system-overview.md) stores original collected records, derived usage, and saved time markers in local SQLite. Original Codex JSONL files are read-only. The usage dataset can be rebuilt from the collected records while preserving those records and user-authored data.
+The [usage analytics backend](./02-architecture/02-design/000-system-overview.md) stores original collected records, derived usage, and saved time markers in local SQLite. Original Codex JSONL files are read-only. The usage dataset can be rebuilt from the collected records while preserving those records and user-authored data. The [statistics calculations](./02-architecture/02-design/020-backend-class-design.md#statistics-classes) read the committed dataset and produce measurements on demand.
 
 Existing `annotations.json` and `experiments.json` files continue to hold their user-authored data. Preserve stable session and event references and save annotation files atomically.
 

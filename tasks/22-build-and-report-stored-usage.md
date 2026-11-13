@@ -1,24 +1,24 @@
 ## Title
 
-Build usage reports from collected Codex records
+Transform collected Codex records into stored usage
 
 ## Goal
 
-Rebuild usage from the retained logs and compare the selected reporting period with the period since a saved time marker.
+Produce agent thread and usage records from the retained logs so the reporting layer can query a committed dataset.
 
 ## Dependencies
 
-- [Task 21](./21-collect-original-codex-records.md) provides the persisted records and raw store operations.
+- [Task 21](./21-collect-original-codex-records.md) provides raw collection, the generic writer, and the SQLite replay reader.
 
 ## Work
 
-- Implement [`UsageBuilder`](../specification/02-architecture/02-design/020-backend-class-design.md#usagebuilder) and extend [`UsageStore`](../specification/02-architecture/02-design/020-backend-class-design.md#usagestore) to publish and query [`CodexAgentThread`](../specification/02-architecture/02-design/010-usage-data-model.md#codexagentthread) and [`CodexUsage`](../specification/02-architecture/02-design/010-usage-data-model.md#codexusage). Reuse existing parsing and accounting where it supports the [rebuild and accounting rules](../specification/02-architecture/02-design/000-system-overview.md#usage-rebuild-and-accounting).
-- Wire source refresh to collect records and then rebuild usage. Read the last committed dataset for dashboard filtering and export.
-- Persist [`TimeMarker`](../specification/02-architecture/02-design/010-usage-data-model.md#timemarker) and implement the [saved time marker behavior](../specification/codex-usage-analyzer.md#54-saved-time-markers) and [reporting windows](../specification/codex-usage-analyzer.md#63-visualizations).
+- Extend `CodexLogImporter` to run the [registered transformations](../specification/02-architecture/02-design/020-backend-class-design.md#codexrecordtransformation) and publish [`CodexAgentThread`](../specification/02-architecture/02-design/010-usage-data-model.md#codexagentthread), [`CodexUsage`](../specification/02-architecture/02-design/010-usage-data-model.md#codexusage), and coverage diagnostics in one transaction. Support collection followed by transformation and a rebuild from SQLite alone.
+- Adapt `parser.py` to parse collected lines and preserve separate session, thread, turn, and response identities where supplied. `agents.py` currently keys its hierarchy and usage lookups by session ID. Reuse relationship evidence but resolve a shared owning thread for hierarchy and accounting.
+- Update `analytics.py` to use per-response usage where supported. Its existing cumulative deltas are grouped by session before attribution. Preserve counter validation and compute legacy deltas within verified owner streams. Follow the [rebuild and accounting rules](../specification/02-architecture/02-design/000-system-overview.md#usage-rebuild-and-accounting) for overlap and unknown coverage.
+- Preserve existing session and event references used by annotations and run boundaries, or provide a compatibility mapping where identities change.
 
 ## Acceptance Criteria
 
 - Rebuilding after removing access to the original logs yields the same results from the same collected records. Duplicate or overlapping evidence is accounted for according to the specification.
-- A failed collection or rebuild leaves the last usable metrics available and reports the failure. A successful rebuild preserves collected records, saved markers, and existing annotations.
-- Project-by-time, agent-by-time, and agent-by-project views query the stored dataset with consistent attribution and coverage in reports and exports.
-- Selecting a saved marker shows both metric windows with the same filters and independent daily averages. Empty intersections and legacy intervals crossing a cutoff follow the product specification.
+- A failed collection or transformation leaves the last committed derived dataset available and reports the failure. A successful rebuild preserves collected records and user-authored data.
+- The two registered transformations run through the same importer contract. Reporting can query committed usage and threads with attributable model, project, and coverage information.
