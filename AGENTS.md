@@ -2,7 +2,7 @@
 
 <!--
 This file is the authoritative guide for AI agents and developers working in this repository.
-It applies the single-agent workflow with repository-specific Python guidance.
+It applies the single-agent workflow to the Codex Usage Analyzer.
 
 Maintenance rules:
 - Keep guidance conceptual and operational; avoid implementation-specific details.
@@ -19,7 +19,8 @@ Use one agent to plan, implement, validate, and correct work end to end.
 - Perform the full workflow directly: understand requirements, plan, implement, review the actual diff, and validate.
 - Keep execution focused on the active task and avoid unnecessary process overhead.
 - Do not split normal work into separate implementation and reviewer roles.
-- Review the actual diff yourself and use focused self-review for additional quality checks when needed. Do not spawn subagents.
+- Use focused self-review for additional quality checks when needed.
+- Do not spawn subagents.
 - Keep work sequential, explicit, and lean.
 - Do not create unnecessary coordination artifacts for simple tasks.
 
@@ -68,7 +69,7 @@ flowchart TD
 2. Keep all follow-up iterations for the same task on its existing task branch.
 3. After each iteration, run relevant static checks and inspect actual changes before committing. Fix identified problems and re-check.
 4. Create one implementation commit per completed task. Create later review/fix commits separately, one logical change per commit. Do not amend or squash unless explicitly requested.
-5. Push the task branch after each completed iteration. Set upstream on first push. Committing and pushing each iteration are part of the requested work and do not require additional confirmation.
+5. Push the task branch after each completed iteration. Set upstream on first push. The task workflow authorizes these commits and pushes.
 6. If branch creation, checks, commit, or push cannot complete, stop and report the blocker with current committed/uncommitted/unpushed state.
 
 #### Commit messages
@@ -85,7 +86,7 @@ Examples:
 
 ### 2. Merge working branch into default branch
 
-Run this only when explicitly requested (for example: "merge to default branch", "bring latest to main", "merge work to main", "integrate branch"). Such a request authorizes pushing the default branch and deleting the working branch after success.
+Run this workflow only when the user explicitly requests a merge into the default branch. That request authorizes pushing the updated default branch and deleting the working branch after the push succeeds.
 
 ```mermaid
 flowchart TD
@@ -129,56 +130,49 @@ flowchart TD
 
 ## 1. Repo structure
 
+- `app.py` is the application entry point. `dashboard.py` contains the Streamlit dashboard, and `run.bat` starts the app on Windows. See `README.md` for setup and usage.
+- Root-level Python modules handle session parsing, analytics, annotations, experiments, and exports.
+- `config.toml` defines session sources. `data/` holds local annotations and experiment history. `requirements.txt` lists Python dependencies.
 - `specification/` contains the authoritative product specification.
-- Numbered Markdown files directly inside `tasks/` contain pending task descriptions and dependencies.
-- `tasks/done/` and `tasks/incomplete/` preserve completed and incomplete tasks; `tasks/temp/` holds optional uncommitted task artifacts.
-- Root-level Python modules contain the application, dashboard, parsing, analytics, and supporting features. `README.md` documents usage.
+- `tasks/` holds numbered task files. `tasks/done/` and `tasks/incomplete/` hold task history. Use `tasks/temp/` for optional uncommitted task artifacts.
 
 ## 2. Naming conventions
 
-- Follow PEP 8 conventions for Python code.
-- Use descriptive names that clearly communicate intent.
-- Use `snake_case` for modules, functions, methods, and variables.
-- Use `PascalCase` for classes.
-- Use `UPPER_SNAKE_CASE` for constants.
-- Avoid unnecessary abbreviations and redundant names.
-- Preserve existing project-specific naming conventions.
+- Follow PEP 8 for Python code.
+- Use descriptive names that communicate intent.
+- Preserve existing project naming patterns.
+- Avoid unnecessary abbreviations and ambiguous terms.
+- Keep names consistent with surrounding code.
 
-<!--
-Add any additional project-specific naming rules here.
--->
+Use `snake_case` for modules, functions, methods, and variables, `PascalCase` for classes, and `UPPER_SNAKE_CASE` for constants.
 
 ## 3. Documentation and tests policy
 
 ### Documentation
 
-- Use Google-style docstrings for Python classes and methods.
-- Describe purpose, parameters, return values, and exceptions where applicable.
-- Keep docstrings concise and avoid repeating information obvious from names or type hints.
-- Add inline comments only when necessary to explain **why** something is implemented in a particular way.
-- Document non-obvious decisions, constraints, and workarounds.
-- Avoid comments that merely describe what the code does.
-- Keep documentation consistent with implementation changes.
+- Use Google-style docstrings for Python classes and methods. Describe purpose, parameters, return values, and exceptions where applicable.
+- Document purpose, constraints, and non-obvious decisions.
+- Keep documentation aligned with behavior changes.
+- Prefer concise documentation over verbose repetition.
+- Add comments where the rationale would otherwise be unclear.
 
 ### Tests and validation
 
-- Use agent-performed static analysis and code inspection as the primary validation method.
-- Check changes against task requirements, specifications, and existing architecture.
-- Inspect for logical errors, missing requirements, incorrect dependencies, and unintended changes.
-- Do not create or modify unit tests unless explicitly requested.
-- Do not introduce testing frameworks or additional testing infrastructure.
-- Existing project tests and static analysis tools may be executed when available and relevant.
-- Verify modified code imports and executes correctly when applicable.
-- Do not require new automated tests for task completion.
-- Do not claim successful validation without performing the relevant checks.
+- Use static analysis and code inspection as baseline validation.
+- Verify changes against requirements, specifications, and architecture. Check for logic errors, incorrect dependencies, and unintended changes.
+- Run existing project checks and tests when relevant and available.
+- Verify modified code imports and runs when applicable.
+- Do not add or modify tests unless explicitly requested.
+- Do not introduce test infrastructure or require new automated tests for completion.
+- Do not claim successful validation without actually performing relevant checks.
 
 ### Specification protection
 
 - Treat specifications as authoritative requirements.
-- Do not modify specifications unless explicitly required by the current task.
-- Do not modify specifications to justify implementation differences.
-- If implementation and specifications disagree, correct the implementation or report the conflict.
-- Do not update `AGENTS.md` during ordinary task execution unless explicitly requested.
+- Do not modify specifications unless explicitly required by the task.
+- Do not alter specifications to justify implementation differences.
+- If implementation conflicts with specifications, fix implementation or report the conflict.
+- Do not modify this instruction file during ordinary task execution unless explicitly asked.
 
 ## 4. How-to
 
@@ -211,8 +205,8 @@ Execute numbered Markdown tasks from `tasks/` one at a time, in numeric-prefix o
 
 | Term | Convention |
 |---|---|
-| Pending task | A numbered `.md` file directly inside `tasks/`; exclude `README.md` and other supporting documents. |
-| Task filename | A numeric prefix followed by a short description (for example, `15-remove-source-changes.md`). Preserve existing filenames and sort by numeric prefix. |
+| Pending task | A numbered `.md` file directly inside `tasks/`. |
+| Task filename | A numeric prefix followed by a short description, for example `15-remove-source-changes.md`. Preserve existing filenames. |
 | Completed task | A verified task moved to `tasks/done/`, retaining filename. |
 | Incomplete task | A task moved to `tasks/incomplete/` after five failed verification checks, retaining filename and issue history. |
 | Issue Logs | Append-only section at the bottom of the task file; original task content remains unchanged. |
@@ -220,7 +214,8 @@ Execute numbered Markdown tasks from `tasks/` one at a time, in numeric-prefix o
 | Failed check | Verification check that finds unresolved issues; count up to five per task. |
 | Temporary files | Optional task-specific artifacts in `tasks/temp/`; never commit them. |
 
-Ignore `tasks/done/`, `tasks/incomplete/`, `tasks/temp/`, and supporting documents when discovering pending tasks. Consult `tasks/README.md` for order and dependencies if present.
+Ignore `tasks/done/`, `tasks/incomplete/`, `tasks/temp/`, and supporting documents when discovering pending tasks.
+Consult `tasks/README.md` for order and dependencies if present.
 If task order is ambiguous (for example missing/duplicate numeric prefixes), report and stop.
 
 #### 3. Workflow
@@ -284,7 +279,7 @@ Keep prior entries intact. On the fifth failure, append a final unresolved summa
 - Do not create new test frameworks/infrastructure for this workflow.
 - Record every failed check; stop after the fifth failed check.
 - Write findings before fixes; do not remove earlier findings.
-- Keep branch isolation: one task per branch, created from the latest remote default branch. Before starting the next task, confirm required earlier changes and task-file moves are present there. If integration is pending, report the dependency and stop; do not merge automatically.
+- Create one branch per task from the latest remote default branch. Before starting the next task, confirm that the remote default branch contains the required earlier changes and task-file moves. Report pending integration and stop if any are missing.
 - Never force-push or bypass divergence with unsafe Git operations.
 - Remove safe-to-remove temporary artifacts in `tasks/temp/` after completion.
 - Keep status reporting concise and operational.
