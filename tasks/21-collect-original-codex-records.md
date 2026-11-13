@@ -8,8 +8,8 @@ Keep the original data available for future changes to the parser or usage model
 
 ## Work
 
-- Implement `CollectedCodexRecord`, `CodexLogImporter`, and the raw record operations in `UsageStore` using Python's `sqlite3` and a versioned schema.
-- Follow the [data model and raw collection design](../specification/02-architecture/02-design/000-system-overview.md#raw-collection). Keep collection independent of parsing and accounting. Expose a source-ordered read for the usage builder.
+- Implement [`CollectedCodexRecord`](../specification/02-architecture/02-design/010-usage-data-model.md#collectedcodexrecord), [`CodexLogImporter`](../specification/02-architecture/02-design/020-backend-class-design.md#codexlogimporter), and the raw record operations in [`UsageStore`](../specification/02-architecture/02-design/020-backend-class-design.md#usagestore).
+- Follow the [raw collection workflow](../specification/02-architecture/02-design/000-system-overview.md#raw-collection). Expose a source-ordered read for the usage builder.
 - Reuse configured source directories and the existing file discovery behavior where applicable.
 
 ## Acceptance Criteria

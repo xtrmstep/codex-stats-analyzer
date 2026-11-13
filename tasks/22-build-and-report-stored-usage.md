@@ -12,9 +12,9 @@ Rebuild usage from the retained logs and compare the selected reporting period w
 
 ## Work
 
-- Implement `UsageBuilder` and extend `UsageStore` to publish and query `AgentThread` and `Usage` according to the [backend design](../specification/02-architecture/02-design/000-system-overview.md#usage-rebuild-and-accounting). Reuse existing parsing and accounting where it supports the specified thread identity, usage attribution, and coverage rules.
+- Implement [`UsageBuilder`](../specification/02-architecture/02-design/020-backend-class-design.md#usagebuilder) and extend [`UsageStore`](../specification/02-architecture/02-design/020-backend-class-design.md#usagestore) to publish and query `AgentThread` and `Usage` from the [usage data model](../specification/02-architecture/02-design/010-usage-data-model.md). Reuse existing parsing and accounting where it supports the [rebuild and accounting rules](../specification/02-architecture/02-design/000-system-overview.md#usage-rebuild-and-accounting).
 - Wire source refresh to collect records and then rebuild usage. Read the last committed dataset for dashboard filtering and export.
-- Persist `TimeMarker` and implement the [saved time marker behavior](../specification/codex-usage-analyzer.md#54-saved-time-markers) and [reporting windows](../specification/codex-usage-analyzer.md#63-visualizations).
+- Persist [`TimeMarker`](../specification/02-architecture/02-design/010-usage-data-model.md#timemarker) and implement the [saved time marker behavior](../specification/codex-usage-analyzer.md#54-saved-time-markers) and [reporting windows](../specification/codex-usage-analyzer.md#63-visualizations).
 
 ## Acceptance Criteria
 
