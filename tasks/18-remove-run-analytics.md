@@ -141,3 +141,7 @@ Do not modify `AGENTS.md` or unrelated application functionality.
 - README and product specification match the remaining functionality.
 - Static code inspection and Python compilation complete without errors.
 - No new tests, dependencies, or replacement features are introduced.
+
+## Follow-up
+
+[Task 22](./22-build-and-report-stored-usage.md) introduces saved timestamps for usage reports. Preserve the saved time marker requirements when removing runs and run-based comparisons from the product specification.

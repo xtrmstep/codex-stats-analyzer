@@ -128,3 +128,4 @@ Technical hints:
 ## Dependencies
 
 - Representative Codex JSONL records from the currently used Codex version, including main-agent and subagent activity, are needed to validate thread identity and counter scope before claiming complete conversation totals. <!-- inferred -->
+- Follow the [usage rebuild and accounting rules](../specification/02-architecture/02-design/000-system-overview.md#usage-rebuild-and-accounting). Keep identity resolution and accounting callable on parsed events so [task 22](./22-build-and-report-stored-usage.md) can reuse them on collected records. Local raw collection and SQLite-backed reporting are covered by tasks 21 and 22.

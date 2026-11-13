@@ -117,3 +117,7 @@ Update the relevant specification to reflect independent agent accounting.
 - Missing or incomplete agent data is clearly identified rather than represented as zero or complete.
 - Existing tests, if available, continue to pass; static review confirms that no cross-agent aggregation paths remain.
 - Relevant specifications reflect the updated accounting behavior.
+
+## Follow-up
+
+This task applies conservative accounting to the existing counter streams. [Task 19](./19-sessions-analytics-improvement.md) adds combined totals only for usage whose counter scopes are verified to be independent.

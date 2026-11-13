@@ -90,7 +90,7 @@ Read local Codex session files from:
 - `%USERPROFILE%\.codex\archived_sessions`
 - Additional configured directories
 
-Read source JSONL files without modifying them.
+Read source JSONL files without modifying them. Preserve their original records locally so usage can be rebuilt after the source files are moved or removed. See [Raw collection](./02-architecture/02-design/000-system-overview.md#raw-collection).
 
 ### 3.2 Extracted information
 
@@ -109,7 +109,7 @@ Never treat mentions of a skill or subagent in ordinary conversation text as pro
 
 ### 3.3 Token accounting
 
-Calculate consumption from recorded response usage and supported legacy counter deltas. Apply the [import and accounting rules](./02-architecture/02-design/000-system-overview.md#import-and-accounting) before grouping or filtering usage.
+Calculate consumption from recorded response usage and supported legacy counter deltas. Apply the [rebuild and accounting rules](./02-architecture/02-design/000-system-overview.md#usage-rebuild-and-accounting) before grouping or filtering usage.
 
 Track:
 
@@ -332,7 +332,7 @@ Saved experiments can be reopened and recalculated when new runs become availabl
 
 ## 8. Data storage
 
-The [usage analytics backend](./02-architecture/02-design/000-system-overview.md) stores imported usage and saved time markers in local SQLite. Original Codex JSONL files are read-only. The usage dataset can be rebuilt while preserving user-authored data.
+The [usage analytics backend](./02-architecture/02-design/000-system-overview.md) stores original collected records, derived usage, and saved time markers in local SQLite. Original Codex JSONL files are read-only. The usage dataset can be rebuilt from the collected records while preserving those records and user-authored data.
 
 Existing `annotations.json` and `experiments.json` files continue to hold their user-authored data. Preserve stable session and event references and save annotation files atomically.
 
@@ -344,7 +344,7 @@ No external database or server is required.
 - Streamlit — dashboard UI
 - pandas — data analysis
 - Plotly — interactive charts
-- SQLite — imported usage and saved time markers
+- SQLite — collected Codex records, derived usage, and saved time markers
 - JSON/JSONL — existing user metadata and Codex log input
 
 The application runs locally on Windows and opens at `http://localhost:8501`.
@@ -368,7 +368,7 @@ Bind only to localhost and disable telemetry.
 11. Preserve original Codex files without modification.
 12. Work fully offline without Codex authentication.
 13. Clearly distinguish automatically observed facts, manual annotations, and estimated values.
-14. Reimporting identical Codex usage leaves totals unchanged. A failed import leaves the last successful dataset available.
+14. Reimporting identical logs leaves collected records and usage totals unchanged. Rebuilding usage works from the collected records alone. A failed refresh or rebuild leaves the last successful usage dataset available.
 15. Project and agent usage views show both the selected-period metrics and the metrics since a saved time marker within that period.
 
 ## 11. Implementation priorities
