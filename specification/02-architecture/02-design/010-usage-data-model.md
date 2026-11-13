@@ -6,13 +6,13 @@ The local SQLite model holds collected source records, derived usage, and user-a
 
 One record holds one original JSONL line. It stores a stable record ID, source log identity, source path at collection, line number, exact original line bytes including its terminator when present, and collection timestamp. The source log identity survives a verified append or archive move under the [raw collection rules](./000-system-overview.md#raw-collection).
 
-## AgentThread
+## CodexAgentThread
 
 One record represents one resolved agent execution. It stores the execution identity, native thread ID, session ID, parent thread identity when verified, and observed agent name, role, or nickname when available.
 
 Preserve `session_id` and `thread_id` separately. A verified parent link is optional, including when the parent was omitted from the import. Session ID supports conversation grouping where the source establishes it. Use the configured agent name or role to group executions across chats. A nickname can identify an individual execution in the UI.
 
-## Usage
+## CodexUsage
 
 One record represents a reported response or one legacy counter delta. It stores a stable usage identity, owning thread when verified, observed timestamp, project key and display label when known, model when supported by the matched context, coverage, and a reference to the collected record. The nullable counts are input, output, cached input, cache-write input, reasoning output, and total tokens. Legacy deltas also retain the prior observation time when known.
 

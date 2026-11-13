@@ -12,7 +12,7 @@ Rebuild usage from the retained logs and compare the selected reporting period w
 
 ## Work
 
-- Implement [`UsageBuilder`](../specification/02-architecture/02-design/020-backend-class-design.md#usagebuilder) and extend [`UsageStore`](../specification/02-architecture/02-design/020-backend-class-design.md#usagestore) to publish and query `AgentThread` and `Usage` from the [usage data model](../specification/02-architecture/02-design/010-usage-data-model.md). Reuse existing parsing and accounting where it supports the [rebuild and accounting rules](../specification/02-architecture/02-design/000-system-overview.md#usage-rebuild-and-accounting).
+- Implement [`UsageBuilder`](../specification/02-architecture/02-design/020-backend-class-design.md#usagebuilder) and extend [`UsageStore`](../specification/02-architecture/02-design/020-backend-class-design.md#usagestore) to publish and query [`CodexAgentThread`](../specification/02-architecture/02-design/010-usage-data-model.md#codexagentthread) and [`CodexUsage`](../specification/02-architecture/02-design/010-usage-data-model.md#codexusage). Reuse existing parsing and accounting where it supports the [rebuild and accounting rules](../specification/02-architecture/02-design/000-system-overview.md#usage-rebuild-and-accounting).
 - Wire source refresh to collect records and then rebuild usage. Read the last committed dataset for dashboard filtering and export.
 - Persist [`TimeMarker`](../specification/02-architecture/02-design/010-usage-data-model.md#timemarker) and implement the [saved time marker behavior](../specification/codex-usage-analyzer.md#54-saved-time-markers) and [reporting windows](../specification/codex-usage-analyzer.md#63-visualizations).
 

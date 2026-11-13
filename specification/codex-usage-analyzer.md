@@ -21,7 +21,7 @@ The application must work without Codex authentication, API access, external ser
 
 A Codex conversation identified by its session ID.
 
-A session can contain multiple user requests, execution phases, and agent threads. A thread identifies an individual execution within a session. See the [usage data model](./02-architecture/02-design/010-usage-data-model.md#agentthread) for thread identity rules.
+A session can contain multiple user requests, execution phases, and agent threads. A thread identifies an individual execution within a session. See the [usage data model](./02-architecture/02-design/010-usage-data-model.md#codexagentthread) for thread identity rules.
 
 ### 2.2 Agent
 
