@@ -8,12 +8,11 @@ Rebuild usage from the retained logs and compare the selected reporting period w
 
 ## Dependencies
 
-- [Task 19](./19-sessions-analytics-improvement.md) provides thread identity and accounting behavior.
 - [Task 21](./21-collect-original-codex-records.md) provides the persisted records and raw store operations.
 
 ## Work
 
-- Implement `UsageBuilder` and extend `UsageStore` to publish and query `AgentThread` and `Usage` according to the [backend design](../specification/02-architecture/02-design/000-system-overview.md#usage-rebuild-and-accounting). Reuse the existing parsing, attribution, and accounting logic.
+- Implement `UsageBuilder` and extend `UsageStore` to publish and query `AgentThread` and `Usage` according to the [backend design](../specification/02-architecture/02-design/000-system-overview.md#usage-rebuild-and-accounting). Reuse existing parsing and accounting where it supports the specified thread identity, usage attribution, and coverage rules.
 - Wire source refresh to collect records and then rebuild usage. Read the last committed dataset for dashboard filtering and export.
 - Persist `TimeMarker` and implement the [saved time marker behavior](../specification/codex-usage-analyzer.md#54-saved-time-markers) and [reporting windows](../specification/codex-usage-analyzer.md#63-visualizations).
 
