@@ -91,9 +91,30 @@ def calculate_run(run: dict, events: list[Event], increments: list[Increment]) -
     session = run["session_id"]
     source_events = [event for event in events if event.session_id == session]
     source_increments = [increment for increment in increments if increment.session_id == session]
+    scope_issue = None
+    scope_notes = []
+    threads = {event.thread_id for event in source_events if event.thread_id}
+    if threads:
+        from agents import analyze_agents
+
+        hierarchy = analyze_agents(next(iter(threads)), source_events, [])
+        roots = {thread for thread in threads
+                 if thread in hierarchy.agents and hierarchy.agents[thread].parent_id is None}
+        unresolved_links = any("missing parent" in issue or "conflicting parents" in issue
+                               or "Cycle involving" in issue for issue in hierarchy.diagnostics)
+        if len(roots) == 1 and not unresolved_links:
+            root = next(iter(roots))
+            if any(event.thread_id is None for event in source_events):
+                scope_notes.append("Some events have unknown thread ownership and are excluded from the run.")
+            source_events = [event for event in source_events if event.thread_id == root]
+            source_increments = [increment for increment in source_increments if increment.thread_id == root]
+        else:
+            source_events = []
+            source_increments = []
+            scope_issue = "Root thread is ambiguous; run usage is unknown."
     boundary = run.get("boundary", {"type": "whole_session"})
     kind = boundary["type"]
-    diagnostics = []
+    diagnostics = scope_notes + ([scope_issue] if scope_issue else [])
     selected = []
     selected_events = []
     elapsed = None
@@ -102,8 +123,10 @@ def calculate_run(run: dict, events: list[Event], increments: list[Increment]) -
     observed = [time for time in times if time is not None]
     if "boundaries" in run and "boundary" not in run:
         diagnostics.append("Legacy boundaries are unsupported; choose a supported boundary before calculating usage.")
-    elif not source_events:
+    elif not source_events and not scope_issue:
         diagnostics.append("Source session is unavailable; run usage is unknown.")
+    elif scope_issue:
+        pass
     elif kind == "whole_session":
         selected = source_increments
         selected_events = source_events

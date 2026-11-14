@@ -50,7 +50,7 @@ class DatabaseWriter:
 
     def _initialize_schema(self) -> None:
         version = self.connection.execute("PRAGMA user_version").fetchone()[0]
-        if version > 2:
+        if version > 4:
             raise ValueError(f"Unsupported database schema version: {version}")
         if version == 0:
             with self.connection:
@@ -89,6 +89,23 @@ class DatabaseWriter:
                     "source_record_id TEXT, execution_id TEXT, observed_at TEXT, message TEXT NOT NULL)"
                 )
                 self.connection.execute("PRAGMA user_version = 2")
+            version = 2
+        if version == 2:
+            with self.connection:
+                self.connection.execute(
+                    "CREATE TABLE IF NOT EXISTS time_markers ("
+                    "marker_id TEXT PRIMARY KEY, name TEXT NOT NULL, timestamp TEXT NOT NULL)"
+                )
+                self.connection.execute(
+                    "CREATE TABLE IF NOT EXISTS import_state (id INTEGER PRIMARY KEY CHECK (id = 1), "
+                    "initialized INTEGER NOT NULL)"
+                )
+                self.connection.execute("PRAGMA user_version = 3")
+            version = 3
+        if version == 3:
+            with self.transaction():
+                self.connection.execute("ALTER TABLE coverage_diagnostics ADD COLUMN kind TEXT NOT NULL DEFAULT 'usage'")
+                self.connection.execute("PRAGMA user_version = 4")
 
     @contextmanager
     def transaction(self):
@@ -288,14 +305,17 @@ class CodexLogImporter:
                         raise TypeError("Transformation returned an unexpected record type.")
                     table, mapping = transformation.destination
                     outputs.append((table, mapping, [asdict(row) for row in rows]))
-                    coverage.extend(diagnostics)
+                    coverage.extend({**item, "kind": "hierarchy" if table == "agent_threads" else "usage"}
+                                    for item in diagnostics)
                 for table, _, _ in reversed(outputs):
                     connection.execute(f"DELETE FROM {_identifier(table)}")
                 connection.execute("DELETE FROM coverage_diagnostics")
                 for table, mapping, rows in outputs:
                     self.writer.write(table, mapping, rows)
-                columns = ("source_record_id", "execution_id", "observed_at", "message")
+                columns = ("source_record_id", "execution_id", "observed_at", "message", "kind")
                 self.writer.write("coverage_diagnostics", {column: column for column in columns}, coverage)
+                self.writer.write("import_state", {"id": "id", "initialized": "initialized"},
+                                  [{"id": 1, "initialized": 1}], ("id",))
             return True, []
         except Exception as exc:
             return False, [Diagnostic(str(self.writer.database_path), None, f"Cannot rebuild usage: {exc}", fatal=True)]

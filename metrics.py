@@ -29,6 +29,7 @@ class Filters:
     label_mode: str = "all"
     task_types: frozenset[str] | None = None
     execution_modes: frozenset[str] | None = None
+    time_zone: str = "UTC"
 
 
 @dataclass(frozen=True)
@@ -54,11 +55,12 @@ def build_dataset(events: list[Event], increments: list[Increment]) -> pd.DataFr
     the original accounting event available for provenance. Unknown model
     attribution from accounting is never replaced by contextual model values.
     """
-    contexts: dict[str, dict[str, str | None]] = {}
+    contexts: dict[tuple[str, str], dict[str, str | None]] = {}
     context_by_reference: dict[str, dict[str, str | None]] = {}
     rows = []
     for event in events:
-        context = contexts.setdefault(event.session_id, {"project": None, "agent_role": None, "model": None})
+        owner = (event.session_id, event.thread_id or event.session_id)
+        context = contexts.setdefault(owner, {"project": None, "agent_role": None, "model": None})
         if event.project_path:
             context["project"] = event.project_path
         if event.agent_role:
@@ -67,7 +69,7 @@ def build_dataset(events: list[Event], increments: list[Increment]) -> pd.DataFr
             context["model"] = event.model
         context_by_reference[event.reference] = context.copy()
         rows.append({"reference": event.reference, "session": event.session_id,
-                     "agent": event.session_id, "parent": event.parent_agent_id,
+                     "agent": event.thread_id or event.session_id, "parent": event.parent_agent_id,
                      "project": context["project"], "model": context["model"],
                      "agent_role": context["agent_role"], "timestamp": event.timestamp,
                      "increment": None})
@@ -93,9 +95,9 @@ def filter_dataset(frame: pd.DataFrame, selection: Filters, annotations: dict | 
         if selected is not None:
             mask &= frame[column].isin(selected)
     if selection.start_date:
-        mask &= frame["timestamp"] >= pd.Timestamp(selection.start_date, tz="UTC")
+        mask &= frame["timestamp"] >= pd.Timestamp(selection.start_date, tz=selection.time_zone).tz_convert("UTC")
     if selection.end_date:
-        mask &= frame["timestamp"] < pd.Timestamp(selection.end_date + timedelta(days=1), tz="UTC")
+        mask &= frame["timestamp"] < pd.Timestamp(selection.end_date + timedelta(days=1), tz=selection.time_zone).tz_convert("UTC")
     manual = any(value is not None for value in (selection.label_ids, selection.task_types, selection.execution_modes))
     if manual:
         if annotations is None:

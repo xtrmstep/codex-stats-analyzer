@@ -8,9 +8,11 @@ import plotly.express as px
 import streamlit as st
 
 from agents import analyze_agents
-from analytics import calculate_increments
-from metrics import Filters, build_dataset, filter_dataset, grouped, summarize, time_buckets
-from parser import ingest
+from analytics import Total, calculate_increments
+from metrics import Filters, build_dataset, filter_dataset
+from parser import parse_collected
+from collection import CodexLogImporter, CodexLogReader, DatabaseWriter
+from statistics_ui import display_timezone, marker_controls, render_statistics
 from annotations import MetadataStore, StorageError, missing_sessions
 from labels_ui import manage
 from labels import assigned, matches, run_labels
@@ -27,29 +29,30 @@ def _display(total, suffix=""):
     return f"{number}{suffix}" + (" (partial)" if not total.complete else "")
 
 
-def _metric_value(total, suffix=""):
-    """Keep the compact KPI value separate from its coverage description."""
-    if total.value is None:
-        return "Unknown"
-    number = f"{total.value:,.1f}" if isinstance(total.value, float) else f"{total.value:,}"
-    return f"{number}{suffix}"
-
 def _options(frame, column, label):
     values = sorted(frame[column].dropna().unique().tolist())
     selected = st.sidebar.multiselect(label, values)
     return frozenset(selected) if selected else None
 
 
-def _chart_rows(groups):
-    return [{"Group": str(key) if key is not None else "Unknown", "Tokens": metric.totals["total_tokens"].value,
-             "Coverage": "Complete" if metric.totals["total_tokens"].complete else "Partial or unknown"}
-            for key, metric in groups]
-
-
 def render(sources):
     """Render the overview and selected session from local read-only sources."""
     refresh_requested = st.sidebar.button("Refresh sources")
-    parsed = ingest(sources)
+    writer = DatabaseWriter()
+    reader = CodexLogReader()
+    importer = CodexLogImporter(reader, writer)
+    initialized = writer.connection.execute("SELECT initialized FROM import_state WHERE id = 1").fetchone()
+    first_attempt = not initialized and not st.session_state.get("initial_import_attempted", False)
+    if first_attempt or refresh_requested:
+        st.session_state["initial_import_attempted"] = True
+        successful, diagnostics = importer.refresh(sources)
+        st.session_state["source_diagnostics"] = [(item.source, item.message, item.fatal) for item in diagnostics]
+        st.session_state["source_refresh_failed"] = not successful
+    for source, message, fatal in st.session_state.get("source_diagnostics", []):
+        (st.error if fatal else st.warning)(f"{source}: {message}")
+    if st.session_state.get("source_refresh_failed", False):
+        st.warning("Showing the last committed usage dataset.")
+    parsed = parse_collected(reader.replay(writer.connection))
     accounting = calculate_increments(parsed.events)
     frame = build_dataset(parsed.events, accounting.increments)
     store = MetadataStore(Path(__file__).resolve().parent / "data" / "annotations.json", "annotations")
@@ -73,15 +76,17 @@ def render(sources):
                 for name, issue in unresolved:
                     st.write(f"{name}: {issue}")
     st.sidebar.header("Filters")
+    zone = display_timezone()
+    marker = marker_controls(writer)
     st.sidebar.caption("Manual filters select matching session usage and matching run intervals. Run boundaries are estimated; overlapping runs are counted once globally.")
-    use_dates = st.sidebar.checkbox("Filter dates (UTC)")
+    use_dates = st.sidebar.checkbox("Filter dates")
     start = end = None
     if use_dates:
-        dates = frame["timestamp"].dropna()
+        dates = frame["timestamp"].dropna().dt.tz_convert(zone)
         if dates.empty:
             st.sidebar.info("No timestamped events are available.")
         else:
-            bounds = st.sidebar.date_input("UTC date range", (dates.min().date(), dates.max().date()))
+            bounds = st.sidebar.date_input("Date range", (dates.min().date(), dates.max().date()))
             if len(bounds) == 2:
                 start, end = bounds
     definitions = {item["id"]: item for item in snapshot.data["labels"]} if snapshot else {}
@@ -94,11 +99,17 @@ def render(sources):
         mode_values = sorted(set(mode_values) | {run["execution_mode"] for run in snapshot.data["runs"] if run.get("execution_mode")})
     task_types = st.sidebar.multiselect("Manual task type", task_values)
     execution_modes = st.sidebar.multiselect("Manual execution mode", mode_values)
-    selection = Filters(start_date=start, end_date=end,
+    projects = writer.connection.execute(
+        "SELECT DISTINCT project_key, source_working_directory FROM usage_records WHERE project_key IS NOT NULL"
+    ).fetchall()
+    selected_projects = st.sidebar.multiselect("Projects", sorted({row[0] for row in projects}))
+    project_keys = frozenset(selected_projects) if selected_projects else None
+    source_projects = frozenset(row[1] for row in projects if row[0] in selected_projects and row[1])
+    selection = Filters(start_date=start, end_date=end, time_zone=zone,
                         label_ids=frozenset(chosen_labels) if chosen_labels else None, label_mode=label_mode,
                         task_types=frozenset(task_types) if task_types else None,
                         execution_modes=frozenset(execution_modes) if execution_modes else None,
-                        projects=_options(frame, "project", "Projects"),
+                        projects=source_projects if project_keys is not None else None,
                         models=_options(frame, "model", "Models"),
                         sessions=_options(frame, "session", "Sessions"),
                         agent_roles=_options(frame, "agent_role", "Agent roles"))
@@ -126,87 +137,38 @@ def render(sources):
         selected = selected.loc[selected.index.isin(indices)].copy()
         selected.attrs["manual_filter"] = True
         selected.attrs["run_filter"] = True
-    metrics = summarize(selected, parsed.events)
-    st.caption("UTC dates filter observed event times. Usage may have occurred before its counter timestamp. Partial totals are not complete coverage.")
-    columns = st.columns(5)
-    columns[0].metric("Total tokens", _metric_value(metrics.totals["total_tokens"]))
-    columns[1].metric("Input tokens", _metric_value(metrics.totals["input_tokens"]))
-    columns[2].metric("Output tokens", _metric_value(metrics.totals["output_tokens"]))
-    columns[3].metric("Cache percentage", _metric_value(metrics.totals["cache_percentage"], "%"))
-    columns[4].metric("Sessions / agents", f"{metrics.sessions} / {metrics.agents}")
-    coverage = [(label, metrics.totals[key]) for label, key in
-                (("Total", "total_tokens"), ("Input", "input_tokens"), ("Output", "output_tokens"), ("Cache", "cache_percentage"))]
-    st.caption("Coverage: " + "; ".join(f"{label}: {'unknown' if total.value is None else 'complete' if total.complete else 'partial'}" for label, total in coverage))
-    st.caption(f"Subagent share: {_display(metrics.subagent_share, '%')}. Parent counters may include child usage.")
+    selected_record_ids = None
+    if chosen_runs or manual_active:
+        references = set(selected["reference"])
+        selected_record_ids = frozenset(event.record_id for event in parsed.events
+                                        if event.reference in references and event.record_id)
+    report_request, report_calculator, report_result = render_statistics(writer, selection, zone, marker, project_keys,
+                                                                        selected_agent, selected_record_ids)
     run_rows, run_mean, run_median = run_summary(run_matches, parsed.events, snapshot.data if snapshot else None)
     run_columns = st.columns(3)
     run_columns[0].metric("Runs", len(run_rows))
     run_columns[1].metric("Average tokens per run", f"{run_mean:,.1f}" if run_mean is not None else "Unknown")
     run_columns[2].metric("Median tokens per run", f"{run_median:,.1f}" if run_median is not None else "Unknown")
-    st.caption("Run averages and medians include known values only.")
-    st.caption("Run totals cover root-thread counters only, may be partial, and exclude child usage. Overlapping runs and multiple labels are not additive.")
+    st.caption("Run averages and medians include known values only. Run attribution is estimated.")
     if selected.empty:
         st.info("No observed events match the selected filters.")
     else:
-        frequency = st.radio("Time aggregation", ["daily", "weekly", "monthly"], horizontal=True)
-        trend = pd.DataFrame(_chart_rows(time_buckets(selected, parsed.events, frequency)))
-        st.subheader("Token usage over time")
-        if trend["Tokens"].notna().any():
-            st.plotly_chart(px.bar(trend, x="Group", y="Tokens", color="Coverage", labels={"Group": "UTC period"}), use_container_width=True)
-        else:
-            st.info("Token usage is unknown for these periods.")
-        st.caption("Unknown dates form a separate group. Group totals may overlap and should not be added.")
-        dimension = st.selectbox("Break down by", ["project", "model", "session", "run", "label"])
-        if dimension in {"run", "label"}:
-            breakdown_rows = []
-            category_indices = {}
-            for run, result, run_frame in run_matches:
-                if dimension == "run":
-                    value = summarize(run_frame, parsed.events).totals["total_tokens"]
-                    breakdown_rows.append({"Group": run["name"], "Tokens": value.value, "Coverage": "Partial or unknown"})
-                else:
-                    explicit, inherited = run_labels(snapshot.data, run)
-                    names = [definitions[label]["name"] for label in explicit | inherited if label in definitions] or ["Unlabeled"]
-                    for name in names:
-                        category_indices.setdefault(name, set()).update(run_frame.index)
-            if dimension == "label":
-                for session in selected["session"].dropna().unique():
-                    for label in assigned(snapshot.data, "session", session):
-                        if label in definitions:
-                            category_indices.setdefault(definitions[label]["name"], set()).update(selected.index[selected["session"] == session])
-                for name, indices in category_indices.items():
-                    subset = selected.loc[selected.index.isin(indices)].copy()
-                    subset.attrs["run_filter"] = True
-                    value = summarize(subset, parsed.events).totals["total_tokens"]
-                    breakdown_rows.append({"Group": name, "Tokens": value.value, "Coverage": "Partial or unknown"})
-            breakdown = pd.DataFrame(breakdown_rows, columns=["Group", "Tokens", "Coverage"])
-        else:
-            breakdown = pd.DataFrame(_chart_rows(grouped(selected, parsed.events, dimension)))
-        st.subheader("Token breakdown")
-        if breakdown["Tokens"].notna().any():
-            st.plotly_chart(px.bar(breakdown, x="Group", y="Tokens", color="Coverage"), use_container_width=True)
-        else:
-            st.info("No known token totals for this breakdown.")
-        st.subheader("Input and output")
-        distribution = [{"Component": label, "Tokens": metrics.totals[key].value, "Coverage": "Complete" if metrics.totals[key].complete else "Partial or unknown"}
-                        for label, key in (("Cached input", "cached_input_tokens"), ("Non-cached input", "non_cached_input_tokens"), ("Output", "output_tokens"))]
-        if any(item["Tokens"] is not None for item in distribution):
-            st.plotly_chart(px.bar(pd.DataFrame(distribution), x="Component", y="Tokens", color="Coverage"), use_container_width=True)
-        else:
-            st.info("Token components are unknown.")
         st.subheader("Runs")
         st.dataframe(pd.DataFrame(run_rows), hide_index=True, use_container_width=True)
         st.download_button("Download filtered runs CSV", csv_bytes(run_rows, RUN_COLUMNS), file_name="runs.csv", mime="text/csv")
         st.subheader("Sessions")
-        sessions = grouped(selected, parsed.events, "session")
+        sessions = sorted(selected["session"].dropna().unique().tolist())
+        session_metrics = {item.agent: item for item in report_result["Full selected period"][1]["Session"]}
         session_rows = []
-        for key, value in sessions:
+        for key in sessions:
+            value = session_metrics.get(key)
             times = selected.loc[selected["session"] == key, "timestamp"].dropna()
-            session_rows.append({"Session": key, "Tokens": value.totals["total_tokens"].value,
-                                 "Input": value.totals["input_tokens"].value, "Output": value.totals["output_tokens"].value,
-                                 "Coverage": "Complete" if value.totals["total_tokens"].complete else "Partial or unknown",
-                                 "Provenance": "; ".join(value.provenance),
-                                 "Agents": value.agents,
+            session_rows.append({"Session": key, "Tokens": value.totals["total_tokens"] if value else None,
+                                 "Input": value.totals["input_tokens"] if value else None,
+                                 "Output": value.totals["output_tokens"] if value else None,
+                                 "Coverage": value.coverage if value else "unknown",
+                                 "Provenance": "committed usage records",
+                                 "Agents": value.agents if value else 0,
                                  "First observed UTC": times.min().isoformat() if not times.empty else None,
                                  "Last observed UTC": times.max().isoformat() if not times.empty else None})
         st.dataframe(pd.DataFrame(session_rows), hide_index=True, use_container_width=True)
@@ -214,8 +176,14 @@ def render(sources):
         st.caption("CSV uses UTF-8 with BOM, UTC ISO 8601 timestamps, blank unknown values and token/second units indicated in the column names.")
         session_ids = sorted(selected["session"].dropna().unique().tolist())
         if session_ids:
-            root = st.selectbox("Session detail", session_ids)
-            details(root, selected, parsed.events, accounting.increments, use_dates)
+            session_id = st.selectbox("Session detail", session_ids)
+            thread_rows = [row for row in report_calculator.threads if row["session_id"] == session_id]
+            execution_ids = {row["execution_id"] for row in thread_rows}
+            roots = [row["thread_id"] for row in thread_rows if row["parent_execution_id"] not in execution_ids]
+            if roots:
+                root = st.selectbox("Root agent", roots)
+                details(root, selected, parsed.events, accounting.increments, use_dates,
+                        report_calculator, replace(report_request, sessions=frozenset({session_id}), marker=None))
     if snapshot is not None:
         render_experiments(snapshot.data, parsed.events, accounting.increments, selected, selection, selected_agent, chosen_runs)
     with st.expander(f"Parsing and accounting diagnostics ({len(parsed.diagnostics) + len(accounting.diagnostics)})"):
@@ -223,10 +191,18 @@ def render(sources):
             st.write(f"{item.source}:{item.line or '-'} — {item.message}")
         for item in accounting.diagnostics:
             st.write(item)
+    writer.close()
 
 
-def details(root, selected, events, increments, date_filter_active=False):
+def details(root, selected, events, increments, date_filter_active=False, calculator=None, report_request=None):
     """Show hierarchy as context, while all usage follows active filters."""
+    def measurement(agent_ids):
+        allowed = set(agent_ids)
+        if report_request.agents is not None:
+            allowed &= set(report_request.agents)
+        request = replace(report_request, agents=frozenset(allowed))
+        return calculator.calculate(request)["Full selected period"][0]
+
     hierarchy = analyze_agents(root, events, increments)
     st.subheader("Agent hierarchy")
     st.caption("Hierarchy is context from all evidence; token metrics below respect the active filters. Unlinked agents are not assigned to this tree.")
@@ -246,15 +222,15 @@ def details(root, selected, events, increments, date_filter_active=False):
     selected_agents = set(selected["agent"].dropna())
     for agent_id in sorted(tree_ids):
         agent = hierarchy.agents[agent_id]
-        agent_frame = selected.loc[selected["agent"] == agent_id]
-        totals = summarize(agent_frame, events)
+        totals = measurement({agent_id})
         rows.append({"Agent": agent_id, "Parent": agent.parent_id, "Role": agent.role, "Nickname": agent.nickname,
-                     "Model": agent.model, "Status": agent.status, "Tokens": _display(totals.totals["total_tokens"]),
-                     "Cache %": _display(totals.totals["cache_percentage"], "%"),
+                     "Model": agent.model, "Status": agent.status,
+                     "Tokens": _display(Total(totals.totals["total_tokens"], totals.coverage == "complete")),
+                     "Cache %": _display(Total(totals.cache_percentage, totals.coverage == "complete"), "%"),
                      "First observed": agent.activity.first, "Last observed": agent.activity.last})
         activity = agent.activity
         times = pd.to_datetime(
-            [event.timestamp for event in events if event.session_id == agent_id
+            [event.timestamp for event in events if (event.thread_id or event.session_id) == agent_id
              and event.reference in selected_references and event.timestamp],
             format="mixed", utc=True, errors="coerce")
         times = times[~times.isna()]
@@ -265,12 +241,12 @@ def details(root, selected, events, increments, date_filter_active=False):
                 and activity.verified_start and activity.verified_end):
             timeline.append({"Agent": agent_id, "Start": activity.verified_start, "End": activity.verified_end, "Evidence": "Verified execution interval"})
     st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
-    st.write(f"Main agent tokens under filters: {_display(summarize(selected.loc[selected['agent'] == root], events).totals['total_tokens'])}")
+    main_metrics = measurement({root})
+    st.write(f"Main agent tokens under filters: {_display(Total(main_metrics.totals['total_tokens'], main_metrics.coverage == 'complete'))}")
     descendant_ids = tree_ids - {root}
-    main_metrics = summarize(selected.loc[selected["agent"] == root], events)
-    sub_metrics = summarize(selected.loc[selected["agent"].isin(descendant_ids)], events)
-    comparison = [{"Agent group": label, "Tokens": item.totals["total_tokens"].value,
-                   "Coverage": "Complete" if item.totals["total_tokens"].complete else "Partial or unknown"}
+    sub_metrics = measurement(descendant_ids)
+    comparison = [{"Agent group": label, "Tokens": item.totals["total_tokens"],
+                   "Coverage": item.coverage}
                   for label, item in (("Main", main_metrics), ("Subagents", sub_metrics))]
     if any(item["Tokens"] is not None for item in comparison):
         st.plotly_chart(px.bar(pd.DataFrame(comparison), x="Agent group", y="Tokens", color="Coverage"), use_container_width=True)
