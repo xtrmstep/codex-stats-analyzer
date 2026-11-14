@@ -73,6 +73,12 @@ def _string(value: Any) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
+def read_source_lines(path: Path) -> list[bytes]:
+    """Read original lines without decoding or changing their terminators."""
+    with path.open("rb") as source:
+        return source.readlines()
+
+
 def _normalize(raw: dict[str, Any], session_id: str, source: Path, line: int, reference: str, metadata: dict[str, str]) -> Event:
     payload = raw.get("payload") if isinstance(raw.get("payload"), dict) else {}
     kind = _string(raw.get("type")) or "unknown"
@@ -141,8 +147,7 @@ def ingest(roots: list[Path]) -> IngestionResult:
     supported = {"session_meta", "turn_context", "event_msg", "response_item", "token_usage_record"}
     for path in discover_files(roots, result.diagnostics):
         try:
-            with path.open("rb") as file:
-                lines = file.readlines()
+            lines = read_source_lines(path)
         except OSError as exc:
             result.diagnostics.append(Diagnostic(str(path), None, f"Cannot read source: {exc}"))
             continue
