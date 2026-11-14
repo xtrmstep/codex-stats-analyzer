@@ -59,15 +59,20 @@ def _render(sources, writer, page, start, end, range_ready):
         marker_editor(writer)
         return
 
+    filters = st.sidebar.container()
+    with filters:
+        st.subheader("Filters")
     configuration = st.container()
     with configuration:
         st.subheader("Overview configuration")
         refresh_requested = st.button("Refresh sources")
-        marker = marker_selector(writer)
         bucket = st.radio("Time aggregation", ["hourly", "daily", "weekly", "monthly"], index=1, horizontal=True)
         view = st.selectbox("Usage view", ["Project over time", "Agent over time", "Agent by project", "Model", "Session"])
         sort_by = st.selectbox("Sort by", ["Group", "Total tokens"])
         sort_order = st.radio("Sort order", ["Ascending", "Descending"], horizontal=True)
+
+    with filters:
+        marker = marker_selector(writer)
 
     reader = CodexLogReader()
     importer = CodexLogImporter(reader, writer)
@@ -98,7 +103,7 @@ def _render(sources, writer, page, start, end, range_ready):
     parsed = report_calculator.parsed
     accounting = calculate_increments(parsed.events)
     frame = build_dataset(parsed.events, accounting.increments)
-    with configuration:
+    with filters:
         projects = {(row["project_key"], row["source_working_directory"]) for row in report_calculator.rows
                     if row["project_key"] is not None}
         selected_projects = st.multiselect("Projects", sorted({row[0] for row in projects}))
