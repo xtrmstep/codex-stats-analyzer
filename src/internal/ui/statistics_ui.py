@@ -12,40 +12,52 @@ from internal.ui.exports import csv_bytes
 from internal.analytics.usage_statistics import StatsRequest, delete_marker, list_markers, save_marker
 
 
-def marker_controls(writer):
-    """Render saved marker selection and management controls."""
+def marker_selector(writer):
+    """Select an existing marker for the Overview report."""
+    markers = list_markers(writer.connection)
+    by_id = {marker.marker_id: marker for marker in markers}
+    choice = st.selectbox("Saved time marker", ["None"] + list(by_id),
+                          format_func=lambda key: by_id[key].name if key in by_id else key)
+    return by_id.get(choice)
+
+
+def marker_editor(writer):
+    """Create, edit, or delete saved markers."""
     markers = list_markers(writer.connection)
     by_id = {marker.marker_id: marker for marker in markers}
     if "new_marker_default_timestamp" not in st.session_state:
         st.session_state["new_marker_default_timestamp"] = datetime.now(timezone.utc).isoformat()
-    with st.sidebar.expander("Saved time markers"):
-        choice = st.selectbox("Marker", ["None"] + list(by_id),
-                              format_func=lambda key: by_id[key].name if key in by_id else key)
-        selected = by_id.get(choice)
-        with st.form("marker_editor"):
-            name = st.text_input("Name", value=selected.name if selected else "")
-            timestamp = st.text_input("Timestamp with time zone",
-                                      value=selected.timestamp if selected else st.session_state["new_marker_default_timestamp"])
-            save = st.form_submit_button("Save marker")
-        if save:
-            try:
-                save_marker(writer, name, timestamp, selected.marker_id if selected else None)
-                st.rerun()
-            except (ValueError, OverflowError) as exc:
-                st.error(str(exc))
-        if selected and st.button("Delete marker"):
-            delete_marker(writer, selected.marker_id)
+    st.subheader("Saved time markers")
+    choice = st.selectbox("Marker to edit", ["Create new marker"] + list(by_id),
+                          format_func=lambda key: by_id[key].name if key in by_id else key)
+    selected = by_id.get(choice)
+    with st.form("marker_editor"):
+        name = st.text_input("Name", value=selected.name if selected else "")
+        timestamp = st.text_input("Timestamp with time zone",
+                                  value=selected.timestamp if selected else st.session_state["new_marker_default_timestamp"])
+        save = st.form_submit_button("Save marker")
+    if save:
+        try:
+            save_marker(writer, name, timestamp, selected.marker_id if selected else None)
             st.rerun()
-    return selected
+        except (ValueError, OverflowError) as exc:
+            st.error(str(exc))
+    if selected and st.button("Delete marker"):
+        delete_marker(writer, selected.marker_id)
+        st.rerun()
 
 
 def display_timezone():
     """Select an IANA time zone for report bounds and bucket labels."""
-    zone = st.sidebar.text_input("Display time zone", value="UTC")
+    def remember_timezone():
+        st.session_state["report_timezone"] = st.session_state["report_timezone_input"]
+
+    zone = st.text_input("Display time zone", value=st.session_state.get("report_timezone", "UTC"),
+                         key="report_timezone_input", on_change=remember_timezone)
     try:
         ZoneInfo(zone)
     except (ZoneInfoNotFoundError, ValueError):
-        st.sidebar.error("Enter a valid IANA time zone, such as Europe/Sofia.")
+        st.error("Enter a valid IANA time zone, such as Europe/Sofia.")
         st.stop()
     return zone
 
@@ -84,13 +96,12 @@ def _row(measurement, view=None):
     }
 
 
-def render_statistics(writer, calculator, selection, zone, marker, project_keys, selected_agent, record_ids=None):
+def render_statistics(writer, calculator, selection, zone, marker, project_keys, selected_agent,
+                      bucket, grouping, view, sort_by, sort_order, record_ids=None):
     """Calculate and render both scopes and a selected breakdown."""
     start = pd.Timestamp(selection.start_date, tz=zone).tz_convert("UTC") if selection.start_date else None
     end = (pd.Timestamp(selection.end_date + timedelta(days=1), tz=zone).tz_convert("UTC")
            if selection.end_date else None)
-    bucket = st.radio("Time aggregation", ["hourly", "daily", "weekly", "monthly"], index=1, horizontal=True)
-    grouping = st.radio("Agent grouping", ["thread", "name"], horizontal=True)
     request = StatsRequest(start=start, end=end, time_zone=zone, bucket=bucket, agent_grouping=grouping,
                            marker=marker, projects=project_keys, models=selection.models,
                            sessions=selection.sessions, roles=selection.agent_roles,
@@ -99,7 +110,6 @@ def render_statistics(writer, calculator, selection, zone, marker, project_keys,
     result = calculator.calculate(request)
     full_scope = result["Full selected period"][0]
     request = replace(request, resolved_start=full_scope.start, resolved_end=full_scope.end)
-    view = st.selectbox("Usage view", ["Project over time", "Agent over time", "Agent by project", "Model", "Session"])
     export_rows = []
     for scope_index, (scope, (summary, groups)) in enumerate(result.items()):
         st.subheader(scope)
@@ -130,6 +140,14 @@ def render_statistics(writer, calculator, selection, zone, marker, project_keys,
             st.plotly_chart(px.bar(pd.DataFrame(components), x="Component", y="Tokens"),
                             use_container_width=True, key=f"components_{scope_index}")
         rows = [_row(item, view) for item in groups[view]]
+        if sort_by == "Total tokens":
+            known = sorted((row for row in rows if row["Total tokens"] is not None),
+                           key=lambda row: row["Total tokens"], reverse=sort_order == "Descending")
+            rows = known + [row for row in rows if row["Total tokens"] is None]
+        else:
+            rows.sort(key=lambda row: tuple(str(row[field] or "").casefold()
+                                            for field in ("Project", "Agent", "Model", "Session", "Time")),
+                      reverse=sort_order == "Descending")
         export_rows.extend(rows)
         if rows:
             table = pd.DataFrame(rows)

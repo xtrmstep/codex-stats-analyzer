@@ -1,6 +1,7 @@
 """Streamlit dashboard using the shared analytics contract."""
 
 from dataclasses import replace
+from datetime import date
 import sqlite3
 
 import pandas as pd
@@ -11,16 +12,9 @@ from internal.analytics.agents import analyze_agents
 from internal.analytics.token_accounting import Total, calculate_increments
 from internal.analytics.metrics import Filters, build_dataset, filter_dataset
 from internal.ingestion.collection import CodexLogImporter, CodexLogReader, DatabaseWriter
-from internal.ui.statistics_ui import display_timezone, marker_controls, render_statistics
+from internal.ui.statistics_ui import display_timezone, marker_editor, marker_selector, render_statistics
 from internal.analytics.usage_statistics import StatsCalculation
-from internal.metadata.annotations import MetadataStore, StorageError, missing_sessions
-from internal.ui.labels_ui import manage
-from internal.metadata.labels import assigned, matches, run_labels
-from internal.ui.run_ui import manage_runs, select_runs, run_summary
-from internal.ui.experiment_ui import render_experiments
-from internal.ui.exports import csv_bytes, SESSION_COLUMNS, RUN_COLUMNS
-from internal.metadata.runs import calculate_run
-from internal.paths import DATA_DIR
+from internal.ui.exports import csv_bytes, SESSION_COLUMNS
 
 
 def _display(total, suffix=""):
@@ -32,25 +26,50 @@ def _display(total, suffix=""):
 
 def _options(frame, column, label):
     values = sorted(frame[column].dropna().unique().tolist())
-    selected = st.sidebar.multiselect(label, values)
+    selected = st.multiselect(label, values)
     return frozenset(selected) if selected else None
 
 
 def render(sources):
     """Render the overview and selected session from local read-only sources."""
+    page = st.sidebar.radio("Navigation", ["Overview", "Manual annotations"])
+    date_mode = st.selectbox("Date range", ["All Time", "Custom range"])
+    start = end = None
+    range_ready = True
+    if date_mode == "Custom range":
+        bounds = st.date_input("Selected dates", (date.today(), date.today()))
+        if len(bounds) == 2:
+            start, end = bounds
+        else:
+            range_ready = False
     try:
         writer = DatabaseWriter()
     except (OSError, sqlite3.Error, ValueError) as exc:
         st.error(f"Usage database is unavailable: {exc}")
         return
     try:
-        _render(sources, writer)
+        _render(sources, writer, page, start, end, range_ready)
     finally:
         writer.close()
 
 
-def _render(sources, writer):
-    refresh_requested = st.sidebar.button("Refresh sources")
+def _render(sources, writer, page, start, end, range_ready):
+    if page == "Manual annotations":
+        marker_editor(writer)
+        return
+
+    configuration = st.container()
+    with configuration:
+        st.subheader("Overview configuration")
+        refresh_requested = st.button("Refresh sources")
+        zone = display_timezone()
+        marker = marker_selector(writer)
+        bucket = st.radio("Time aggregation", ["hourly", "daily", "weekly", "monthly"], index=1, horizontal=True)
+        grouping = st.radio("Agent grouping", ["thread", "name"], horizontal=True)
+        view = st.selectbox("Usage view", ["Project over time", "Agent over time", "Agent by project", "Model", "Session"])
+        sort_by = st.selectbox("Sort by", ["Group", "Total tokens"])
+        sort_order = st.radio("Sort order", ["Ascending", "Descending"], horizontal=True)
+
     reader = CodexLogReader()
     importer = CodexLogImporter(reader, writer)
     state = writer.connection.execute("SELECT initialized, needs_rebuild FROM import_state WHERE id = 1").fetchone()
@@ -76,110 +95,37 @@ def _render(sources, writer):
     except (ValueError, OSError, sqlite3.Error) as exc:
         st.error(f"Published usage is unavailable: {exc}")
         return
+
     parsed = report_calculator.parsed
     accounting = calculate_increments(parsed.events)
     frame = build_dataset(parsed.events, accounting.increments)
-    store = MetadataStore(DATA_DIR / "annotations.json", "annotations")
-    try:
-        snapshot = store.load()
-    except StorageError as exc:
-        st.error(f"Manual labels unavailable: {exc}")
-        snapshot = None
-    if snapshot is not None:
-        manage(store, snapshot, sorted(frame["session"].dropna().unique().tolist()))
-        manage_runs(store, snapshot, parsed.events, accounting.increments)
-    if snapshot is not None:
-        missing = missing_sessions(snapshot, {event.session_id for event in parsed.events})
-        if missing:
-            st.warning("Annotations reference unavailable sessions: " + ", ".join(sorted(missing)))
-        unresolved = [(run["name"], issue) for run in snapshot.data["runs"]
-                      for issue in calculate_run(run, parsed.events, accounting.increments).diagnostics
-                      if "missing" in issue.lower() or "unavailable" in issue.lower() or "outside observed" in issue.lower()]
-        if unresolved:
-            with st.expander("Unavailable run references"):
-                for name, issue in unresolved:
-                    st.write(f"{name}: {issue}")
-    st.sidebar.header("Filters")
-    zone = display_timezone()
-    marker = marker_controls(writer)
-    st.sidebar.caption("Manual filters select matching session usage and matching run intervals. Run boundaries are estimated; overlapping runs are counted once globally.")
-    use_dates = st.sidebar.checkbox("Filter dates")
-    start = end = None
-    if use_dates:
-        dates = frame["timestamp"].dropna().dt.tz_convert(zone)
-        if dates.empty:
-            st.sidebar.info("No timestamped events are available.")
-        else:
-            bounds = st.sidebar.date_input("Date range", (dates.min().date(), dates.max().date()))
-            if len(bounds) == 2:
-                start, end = bounds
-    definitions = {item["id"]: item for item in snapshot.data["labels"]} if snapshot else {}
-    chosen_labels = st.sidebar.multiselect("Manual labels", list(definitions), format_func=lambda item: definitions[item]["name"])
-    label_mode = st.sidebar.radio("Match labels", ["all", "any"], horizontal=True)
-    task_values = sorted({item.get("value") for item in definitions.values() if item.get("key", "").casefold() == "task_type" and item.get("value")})
-    mode_values = sorted({item.get("value") for item in definitions.values() if item.get("key", "").casefold() == "execution_mode" and item.get("value")})
-    if snapshot:
-        task_values = sorted(set(task_values) | {run["task_type"] for run in snapshot.data["runs"] if run.get("task_type")})
-        mode_values = sorted(set(mode_values) | {run["execution_mode"] for run in snapshot.data["runs"] if run.get("execution_mode")})
-    task_types = st.sidebar.multiselect("Manual task type", task_values)
-    execution_modes = st.sidebar.multiselect("Manual execution mode", mode_values)
-    projects = {(row["project_key"], row["source_working_directory"]) for row in report_calculator.rows
-                if row["project_key"] is not None}
-    selected_projects = st.sidebar.multiselect("Projects", sorted({row[0] for row in projects}))
-    project_keys = frozenset(selected_projects) if selected_projects else None
-    source_projects = frozenset(row[1] for row in projects if row[0] in selected_projects and row[1])
-    selection = Filters(start_date=start, end_date=end, time_zone=zone,
-                        label_ids=frozenset(chosen_labels) if chosen_labels else None, label_mode=label_mode,
-                        task_types=frozenset(task_types) if task_types else None,
-                        execution_modes=frozenset(execution_modes) if execution_modes else None,
-                        projects=source_projects if project_keys is not None else None,
-                        models=_options(frame, "model", "Models"),
-                        sessions=_options(frame, "session", "Sessions"),
-                        agent_roles=_options(frame, "agent_role", "Agent roles"))
-    chosen_runs = st.sidebar.multiselect("Runs", [run["id"] for run in snapshot.data["runs"]] if snapshot else [],
-                                       format_func=lambda identifier: next((run["name"] for run in snapshot.data["runs"] if run["id"] == identifier), identifier))
-    base_selection = replace(selection, label_ids=None, task_types=None, execution_modes=None)
-    selected = filter_dataset(frame, base_selection)
-    available_agents = sorted(selected["agent"].dropna().unique().tolist())
-    selected_agent = st.sidebar.selectbox("Agent", ["All agents"] + available_agents)
+    with configuration:
+        projects = {(row["project_key"], row["source_working_directory"]) for row in report_calculator.rows
+                    if row["project_key"] is not None}
+        selected_projects = st.multiselect("Projects", sorted({row[0] for row in projects}))
+        project_keys = frozenset(selected_projects) if selected_projects else None
+        source_projects = frozenset(row[1] for row in projects if row[0] in selected_projects and row[1])
+        selection = Filters(start_date=start, end_date=end, time_zone=zone,
+                            projects=source_projects if project_keys is not None else None,
+                            models=_options(frame, "model", "Models"),
+                            sessions=_options(frame, "session", "Sessions"),
+                            agent_roles=_options(frame, "agent_role", "Agent roles"))
+        selected = filter_dataset(frame, selection) if range_ready else frame.iloc[0:0].copy()
+        available_agents = sorted(selected["agent"].dropna().unique().tolist())
+        selected_agent = st.selectbox("Agent", ["All agents"] + available_agents)
+
+    if not range_ready:
+        st.info("Select both dates for the reporting range.")
+        return
     if selected_agent != "All agents":
         selected = selected.loc[selected["agent"] == selected_agent].copy()
-    run_matches = select_runs(snapshot.data, parsed.events, accounting.increments, selection, selected) if snapshot else []
-    if chosen_runs:
-        run_matches = [item for item in run_matches if item[0]["id"] in chosen_runs]
-    manual_active = any(value is not None for value in (selection.label_ids, selection.task_types, selection.execution_modes))
-    if chosen_runs or manual_active:
-        indices = set()
-        if manual_active and not chosen_runs and snapshot:
-            for session in selected["session"].dropna().unique():
-                labels = assigned(snapshot.data, "session", session)
-                if matches(snapshot.data, labels, selection.label_ids, selection.label_mode, selection.task_types, selection.execution_modes):
-                    indices.update(selected.index[selected["session"] == session])
-        for _, _, run_frame in run_matches:
-            indices.update(run_frame.index)
-        selected = selected.loc[selected.index.isin(indices)].copy()
-        selected.attrs["manual_filter"] = True
-        selected.attrs["run_filter"] = True
-    selected_record_ids = None
-    if chosen_runs or manual_active:
-        references = set(selected["reference"])
-        selected_record_ids = frozenset(event.record_id for event in parsed.events
-                                        if event.reference in references and event.record_id)
     report_request, report_calculator, report_result = render_statistics(
-        writer, report_calculator, selection, zone, marker, project_keys, selected_agent, selected_record_ids
+        writer, report_calculator, selection, zone, marker, project_keys, selected_agent,
+        bucket, grouping, view, sort_by, sort_order
     )
-    run_rows, run_mean, run_median = run_summary(run_matches, parsed.events, snapshot.data if snapshot else None)
-    run_columns = st.columns(3)
-    run_columns[0].metric("Runs", len(run_rows))
-    run_columns[1].metric("Average tokens per run", f"{run_mean:,.1f}" if run_mean is not None else "Unknown")
-    run_columns[2].metric("Median tokens per run", f"{run_median:,.1f}" if run_median is not None else "Unknown")
-    st.caption("Run averages and medians include known values only. Run attribution is estimated.")
     if selected.empty:
         st.info("No observed events match the selected filters.")
     else:
-        st.subheader("Runs")
-        st.dataframe(pd.DataFrame(run_rows), hide_index=True, use_container_width=True)
-        st.download_button("Download filtered runs CSV", csv_bytes(run_rows, RUN_COLUMNS), file_name="runs.csv", mime="text/csv")
         st.subheader("Sessions")
         sessions = sorted(selected["session"].dropna().unique().tolist())
         session_metrics = {item.agent: item for item in report_result["Full selected period"][1]["Session"]}
@@ -195,8 +141,15 @@ def _render(sources, writer):
                                  "Agents": value.agents if value else 0,
                                  "First observed UTC": times.min().isoformat() if not times.empty else None,
                                  "Last observed UTC": times.max().isoformat() if not times.empty else None})
+        if sort_by == "Total tokens":
+            known = sorted((row for row in session_rows if row["Tokens"] is not None),
+                           key=lambda row: row["Tokens"], reverse=sort_order == "Descending")
+            session_rows = known + [row for row in session_rows if row["Tokens"] is None]
+        else:
+            session_rows.sort(key=lambda row: str(row["Session"]).casefold(), reverse=sort_order == "Descending")
         st.dataframe(pd.DataFrame(session_rows), hide_index=True, use_container_width=True)
-        st.download_button("Download filtered sessions CSV", csv_bytes(session_rows, SESSION_COLUMNS), file_name="sessions.csv", mime="text/csv")
+        st.download_button("Download filtered sessions CSV", csv_bytes(session_rows, SESSION_COLUMNS),
+                           file_name="sessions.csv", mime="text/csv")
         st.caption("CSV uses UTF-8 with BOM, UTC ISO 8601 timestamps, blank unknown values and token/second units indicated in the column names.")
         session_ids = sorted(selected["session"].dropna().unique().tolist())
         if session_ids:
@@ -206,10 +159,8 @@ def _render(sources, writer):
             roots = [row["thread_id"] for row in thread_rows if row["parent_execution_id"] not in execution_ids]
             if roots:
                 root = st.selectbox("Root agent", roots)
-                details(root, selected, parsed.events, accounting.increments, use_dates,
+                details(root, selected, parsed.events, accounting.increments, start is not None or end is not None,
                         report_calculator, replace(report_request, sessions=frozenset({session_id}), marker=None))
-    if snapshot is not None:
-        render_experiments(snapshot.data, parsed.events, accounting.increments, selected, selection, selected_agent, chosen_runs)
     with st.expander(f"Parsing and accounting diagnostics ({len(parsed.diagnostics) + len(accounting.diagnostics)})"):
         for item in parsed.diagnostics:
             st.write(f"{item.source}:{item.line or '-'} — {item.message}")
