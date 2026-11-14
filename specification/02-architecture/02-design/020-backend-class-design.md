@@ -31,17 +31,20 @@ Parsing is independent of SQLite and the dashboard. Parsers may consult multiple
 | <a name="usagecalculator"></a>`UsageCalculator` | Reads committed rows through the report connection and returns [measurements](./010-usage-data-model.md#usagemeasurement) using shared aggregation. |
 | `ProjectUsageOverTimeCalculator` | Reads `CodexUsage` and groups by project and time bucket. |
 | `AgentUsageOverTimeCalculator` | Reads `CodexUsage` and `CodexAgentThread` and groups by assigned agent name (falling back to recorded name, role, then Default) and time bucket. |
-| `AgentUsageByProjectCalculator` | Reads `CodexUsage` and `CodexAgentThread` and groups by assigned agent name (falling back to recorded name, role, then Default) and project. |
+| `AgentUsageByProjectOverTimeCalculator` | Reads `CodexUsage` and `CodexAgentThread` and groups by project, reporting agent name, and time bucket. |
+| `ModelUsageOverTimeCalculator` | Reads `CodexUsage` and groups by model and time bucket. |
+| Whole-window model, project, and agent calculators | Group eligible rows by their respective dimension across the reporting window. The agent calculator uses the same reporting name as the agent trends. |
 
 ```mermaid
 classDiagram
     StatsCalculation *-- UsageCalculator : registered calculators
     UsageCalculator <|.. ProjectUsageOverTimeCalculator
     UsageCalculator <|.. AgentUsageOverTimeCalculator
-    UsageCalculator <|.. AgentUsageByProjectCalculator
+    UsageCalculator <|.. AgentUsageByProjectOverTimeCalculator
+    UsageCalculator <|.. ModelUsageOverTimeCalculator
 ```
 
-Dashboard and export use the same measurements. Calculate window summaries directly from eligible rows and clip time buckets to the reporting window. See [reporting windows](../../01-screens/030-content.md#reporting-windows).
+Dashboard and export use the same measurements. Calculate window and per-dimension summaries directly from eligible rows and clip time buckets to the reporting window. See [reporting windows](../../01-screens/030-content.md#reporting-windows).
 
 ## Agent analysis
 

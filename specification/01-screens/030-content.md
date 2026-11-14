@@ -9,8 +9,7 @@ This document defines the minimal content area for the two supported application
 | [3.1] View Parameters / View Configuration                                |
 |   - date range                                                            |
 |   - source refresh                                                        |
-|   - dimension selection                                                   |
-|   - grouping selection                                                    |
+|   - time aggregation                                                      |
 +--------------------------------------------------------------------------+
 | [3.2] Metrics                                                            |
 |   - Overview KPIs                                                         |
@@ -18,9 +17,8 @@ This document defines the minimal content area for the two supported application
 |       - total output tokens                                               |
 |       - processing speed                                                  |
 |       - other summary indicators                                          |
-|   - Trends and charts                                                     |
-|       - hourly and daily trend over time                                   |
-|       - breakdown by selected view parameters                             |
+|   - Token consumption over time                                           |
+|   - Total token consumption                                               |
 +--------------------------------------------------------------------------+
 ```
 
@@ -30,12 +28,7 @@ This conceptual layout corresponds to the main content region in [000-main-layou
 
 ### 3.2.1 View Parameters / View Configuration
 
-The first block is dedicated to defining how data is viewed. The user can configure:
-
-- `3.2.1.3` dimension selection
-- `3.2.1.4` grouping criteria, including time aggregation
-
-This block also contains **Refresh sources**. Overview results use the date range and the [sidebar filters](./010-navigation.md#15-filters).
+Show **Date range**, **Refresh sources**, and **Time aggregation**. Time aggregation offers hourly, daily, weekly, and monthly buckets. Overview results use the date range and the [sidebar filters](./010-navigation.md#15-filters).
 
 #### Date range
 
@@ -56,13 +49,27 @@ The second block displays summary metrics and trend visualizations.
 
 #### 3.2.2.1 Overview KPIs
 
-Show total, input, and output tokens, input and output distribution, cache percentage, agent counts, processing speed, average daily tokens, and subagent token share where independently attributable. Distinguish observed facts, manual annotations, and estimates.
+Show total, input, and output tokens, cached and non-cached input counts, cache percentage, agent counts, processing speed, average daily tokens, and subagent token share where independently attributable. Distinguish observed facts, manual annotations, and estimates.
 
 #### 3.2.2.2 Trends and charts
 
-Show token trends by hour, day, week, or month. Include project and agent trends, agent usage by project, breakdowns by model, and cached versus non-cached input. Agent trends and agent usage by project group executions by reporting name. Use the user-assigned name if present, otherwise the recorded name, then the recorded role, then **Default**. The [sidebar Agent filter](./010-navigation.md#15-filters) uses the same reporting name. Support filtering, grouping, and CSV export.
+Below the KPIs for each reporting window, show seven charts in these two sections, in order.
 
-Within each reporting window, display time buckets from oldest to newest by recorded clock time in the trend chart, the breakdown table, and the CSV. Order rows within the same bucket by project or agent name. Show usage with an unknown bucket after dated buckets when present. Whole-window breakdowns use a fixed name order, by project then agent for **Agent by project**, and by model for **Model**. The breakdown table keeps its prescribed row order.
+| Section | Chart | Grouping |
+| --- | --- | --- |
+| Token consumption over time | Project over time | Project and time bucket |
+| | Agent over time | Agent and time bucket |
+| | Agent by project over time | Project, agent, and time bucket, with agents grouped visibly by project |
+| | Model over time | Model and time bucket |
+| Total token consumption | By model | Model across the window |
+| | By project | Project across the window |
+| | By agent | Agent across the window |
+
+All seven charts use the same filtered usage and display total tokens. The trend charts use the selected time aggregation and show buckets from oldest to newest by recorded clock time. An unknown bucket appears after dated buckets when present. The three summaries aggregate the entire reporting window and keep the same totals when time aggregation changes. Show a readable unknown attribution label where applicable and distinguish unknown token counts from zero.
+
+Group agent charts by reporting name. Use the user-assigned name if present, otherwise the recorded name, then the recorded role, then **Default**. The [sidebar Agent filter](./010-navigation.md#15-filters) uses the same reporting name.
+
+Use an empty state for a chart without plottable totals and retain the reporting window's empty-range state. The **Download usage CSV** action includes the scope summary and all seven breakdowns for each reporting window. Within each trend breakdown, order rows by time bucket and then group names. Within each summary breakdown, order rows by group name.
 
 #### Saved time markers
 
@@ -94,7 +101,6 @@ The spec remains minimal until a later UI pass adds page-specific details.
 
 The current scope does not confirm:
 
-- the exact values for grouping dimensions such as conversation, agent, or agent role
 - whether the configuration block is collapsible or always visible
 
 These are intentionally deferred.
