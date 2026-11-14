@@ -9,8 +9,8 @@ from internal.analytics.token_accounting import calculate_increments
 from internal.analytics.metrics import Filters, build_dataset, filter_dataset
 from internal.ingestion.collection import CodexLogImporter, CodexLogReader, DatabaseWriter
 from internal.ui.statistics_ui import marker_editor, marker_selector, render_statistics
-from internal.ui.agent_names_ui import agent_name_editor, execution_labels
-from internal.analytics.usage_statistics import StatsCalculation
+from internal.ui.agent_names_ui import agent_name_editor
+from internal.analytics.usage_statistics import StatsCalculation, reporting_agent_name
 
 
 def _options(frame, column, label):
@@ -104,19 +104,31 @@ def _render(sources, writer, page, start, end, range_ready):
         available_pairs = set(zip(selected["session"], selected["agent"]))
         available_threads = [row for row in report_calculator.threads
                              if (row["session_id"], row["thread_id"]) in available_pairs]
-        labels = execution_labels(available_threads)
-        selected_agent = st.selectbox("Agent", ["All agents"] + sorted(labels, key=lambda key: labels[key].casefold()),
-                                      format_func=lambda key: labels.get(key, key))
+        names = {reporting_agent_name(row) for row in available_threads}
+        all_agents_label = "All agents"
+        if all_agents_label in names:
+            all_agents_label = "All agents (no filter)"
+            suffix = 2
+            while all_agents_label in names:
+                all_agents_label = f"All agents (no filter) {suffix}"
+                suffix += 1
+        if st.session_state.get("overview_agent") not in names:
+            st.session_state["overview_agent"] = None
+        selected_agent = st.selectbox("Agent", [None] + sorted(names, key=lambda name: (name.casefold(), name)),
+                                      format_func=lambda name: all_agents_label if name is None else name,
+                                      key="overview_agent")
+        chosen_threads = [row for row in available_threads if reporting_agent_name(row) == selected_agent]
+        selected_agents = (frozenset(row["execution_id"] for row in chosen_threads)
+                           if selected_agent is not None else None)
 
     if not range_ready:
         st.info("Select both dates for the reporting range.")
         return
-    if selected_agent != "All agents":
-        chosen = next(row for row in available_threads if row["execution_id"] == selected_agent)
-        selected = selected.loc[(selected["session"] == chosen["session_id"]) &
-                                (selected["agent"] == chosen["thread_id"])].copy()
+    if selected_agents is not None:
+        chosen_pairs = {(row["session_id"], row["thread_id"]) for row in chosen_threads}
+        selected = selected.loc[[pair in chosen_pairs for pair in zip(selected["session"], selected["agent"])]].copy()
     render_statistics(
-        writer, report_calculator, selection, marker, project_keys, selected_agent,
+        writer, report_calculator, selection, marker, project_keys, selected_agents,
         bucket, view
     )
     if selected.empty:

@@ -18,3 +18,10 @@ Follow the [Agent filter](../specification/01-screens/010-navigation.md#15-filte
 - Two executions named **Reviewer** in different chats produce one **Reviewer** option. Selecting it includes both executions in both reporting windows, subject to the other criteria.
 - Named subagents use the same reporting-name precedence as the charts. A verified nameless execution appears under **Default**. Agent options contain only names and the default control label.
 - Changing other filters preserves an eligible Agent selection and clears an ineligible one. Role filtering still uses the recorded role. Manual annotations still identifies and edits individual executions.
+
+## Issue Logs
+
+### Failed check 1
+- The Agent selectbox in `src/internal/ui/dashboard.py` displays both the unrestricted option and an execution named `All agents` with identical labels. Streamlit serializes selection using the displayed string, so those options cannot be distinguished reliably.
+- This violates the requirement that the default be independent of the displayed text and that every reporting name remain selectable.
+- Resolve the display collision while preserving distinct internal values; requested clarification on the required presentation.

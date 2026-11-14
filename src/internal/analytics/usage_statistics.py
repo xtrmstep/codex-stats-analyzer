@@ -124,7 +124,8 @@ def _diagnostic_matches(item, request):
     return stamp is None or _date_matches(stamp, request)
 
 
-def _agent(row):
+def reporting_agent_name(row):
+    """Return the reporting name for an execution or usage row."""
     return row.get("assigned_name") or row["agent_name"] or row["role"] or "Default"
 
 
@@ -235,14 +236,14 @@ class AgentUsageOverTimeCalculator(UsageCalculator):
     """Group usage by agent and time."""
 
     def key(self, row, request):
-        return None, _agent(row), _bucket(row["observed"], request)
+        return None, reporting_agent_name(row), _bucket(row["observed"], request)
 
 
 class AgentUsageByProjectCalculator(UsageCalculator):
     """Group usage by agent and project."""
 
     def key(self, row, request):
-        return row["project_key"], _agent(row), None
+        return row["project_key"], reporting_agent_name(row), None
 
 
 class ModelUsageCalculator(UsageCalculator):

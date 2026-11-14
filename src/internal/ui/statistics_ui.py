@@ -94,14 +94,14 @@ def _measurement_key(measurement, view):
     return _name_key(measurement.agent)
 
 
-def render_statistics(writer, calculator, selection, marker, project_keys, selected_agent,
+def render_statistics(writer, calculator, selection, marker, project_keys, selected_agents,
                       bucket, view, record_ids=None):
     """Calculate and render both scopes and a selected breakdown."""
     request = StatsRequest(start_date=selection.start_date, end_date=selection.end_date,
                            bucket=bucket,
                            marker=marker, projects=project_keys, models=selection.models,
                            roles=selection.agent_roles,
-                           agents=frozenset({selected_agent}) if selected_agent != "All agents" else None,
+                           agents=selected_agents,
                            record_ids=record_ids)
     result = calculator.calculate(request)
     full_scope = result["Full selected period"][0]
