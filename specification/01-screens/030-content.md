@@ -7,8 +7,7 @@ This document defines the minimal content area for the two supported application
 ```text
 +--------------------------------------------------------------------------+
 | [3.1] View Parameters / View Configuration                                |
-|   - additional filters                                                    |
-|   - manual annotations / events filters and saved time marker             |
+|   - source refresh                                                        |
 |   - dimension selection                                                   |
 |   - grouping selection                                                    |
 |   - sorting selection                                                     |
@@ -33,17 +32,11 @@ This conceptual layout corresponds to the main content region in [000-main-layou
 
 The first block is dedicated to defining how data is viewed. The user can configure:
 
-- `3.2.1.1` additional filters
-- `3.2.1.2` filtering by manual annotations or events
 - `3.2.1.3` dimension selection
-- `3.2.1.4` grouping criteria
+- `3.2.1.4` grouping criteria, including time aggregation
 - `3.2.1.5` sorting criteria
 
-These parameters determine the data slice being analyzed and should affect all metrics and chart output.
-
-Manual annotations are treated as regular filtering parameters rather than a separate feature area. They extend the available filtering options for the current view.
-
-The overview supports filters for date, project, model, session, observed agent role, and execution mode. The date range is in the [header](./020-header.md#22-header-elements). Use the view configuration for other filters.
+This block also contains **Refresh sources**. Overview results use the [header date range](./020-header.md#22-header-elements) and the [sidebar filters](./010-navigation.md#15-filters).
 
 ### 3.2.2 Metrics
 
@@ -81,7 +74,7 @@ Show results in a comparison table with aggregate bar charts and token-distribut
 
 ### 3.3.1 Parameter-driven updates
 
-All metrics and charts update according to the selected view configuration. The current filtering choices, grouping, sorting, and manual-annotation filters should refresh the displayed KPI values and trend breakdowns. Users can refresh the source data. If a refresh fails, show a diagnostic and keep displaying the last committed results.
+Metrics and charts update according to the header date range, sidebar filters, and applicable view configuration. If source refresh fails, show a diagnostic and keep displaying the last committed results.
 
 ### 3.3.2 Scope boundaries
 
@@ -99,7 +92,6 @@ The current scope does not confirm:
 
 - the exact values for grouping dimensions such as conversation, agent, or agent role
 - whether ordering is ascending, descending, or user-defined
-- how manual annotation filters are expressed in the UI
 - whether the configuration block is collapsible or always visible
 
 These are intentionally deferred.

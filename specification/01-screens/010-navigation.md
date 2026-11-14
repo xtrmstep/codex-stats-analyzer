@@ -1,15 +1,17 @@
-# Navigation
+# Sidebar
 
-This document defines the simplified navigation model for the current product scope. The system contains only two top-level views: an overview and a manual annotations page.
+The sidebar provides navigation between Overview and Manual annotations and contains the filters for Overview.
 
-## 1.1 Navigation sketch
+## 1.1 Sidebar sketch
 
 ```text
 +---------------------------------------------------------------+
-| [1.1] Navigation                                              |
+| Navigation                                                     |
 |                                                               |
 |  1.1.1 Overview                                              |
 |  1.1.2 Manual annotations                                    |
+|                                                               |
+| Filters (Overview)                                            |
 |                                                               |
 +---------------------------------------------------------------+
 ```
@@ -45,3 +47,9 @@ The current scope does not confirm:
 - whether the manual annotations mode is displayed as a dedicated page or a modal form
 
 These remain open for later UI specification work.
+
+## 1.5 Filters
+
+Show **Filters** below **Navigation** when Overview is selected. It contains project, model, session, observed agent role, individual agent, execution mode, and saved time marker selection. The shared [date range](./020-header.md#22-header-elements) is in the header. Manual annotations uses its own editor controls in the main content area.
+
+The filters determine which records contribute to Overview results. The saved time marker adds the [second reporting window](./030-content.md#reporting-windows).

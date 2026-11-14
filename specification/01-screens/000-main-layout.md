@@ -6,7 +6,7 @@ This document defines the minimal application shell for the simplified product s
 
 The application is organized into three primary regions:
 
-- `0.1` navigation region
+- `0.1` sidebar region
 - `0.2` header region
 - `0.3` main content region
 
@@ -16,23 +16,23 @@ The application is organized into three primary regions:
 |   - system title                                                                   |
 |   - date range                                                                     |
 +-------------------------+----------------------------------------------------------+
-| [0.1] Navigation        | [0.3] Main content                                       |
-|   - Overview             |   - overview KPIs and charts                              |
-|   - Manual annotations   |   - manual event editor                                   |
+| [0.1] Sidebar            | [0.3] Main content                                       |
+|   - Navigation           |   - overview report controls, KPIs, and charts            |
+|   - Filters (Overview)   |   - manual event editor                                   |
 +-------------------------+----------------------------------------------------------+
 ```
 
 The page shell is a conceptual reference for the simplified UI. Detailed behavior for each region is defined in the related documents:
 
-- Navigation: [010-navigation.md](./010-navigation.md) (`1.x`)
+- Sidebar: [010-navigation.md](./010-navigation.md) (`1.x`)
 - Header: [020-header.md](./020-header.md) (`2.x`)
 - Content: [030-content.md](./030-content.md) (`3.x`)
 
 ## 0.2 Region responsibilities
 
-### 0.2.1 Navigation region
+### 0.2.1 Sidebar region
 
-The navigation region is the persistent side area for the two supported views: overview and manual annotations. This is documented in [010-navigation.md](./010-navigation.md).
+The left sidebar contains persistent **Navigation** and a **Filters** section for Overview. See the [sidebar specification](./010-navigation.md).
 
 ### 0.2.2 Header region
 
