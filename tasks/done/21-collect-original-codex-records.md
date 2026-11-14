@@ -55,3 +55,7 @@ Keep the original data available for future changes to the parser or usage model
 ### Unresolved summary
 
 Archive matching assumes identical relative directory layouts. Codex archives can use a different layout, so the current implementation cannot reliably identify every verified archive copy. Revise candidate matching and verify flat archives, multiple candidates, rewrites, and byte-prefix continuity before completing the task.
+
+### Resolution
+
+Archive matching now uses the canonical rollout filename across active and archived source locations and verifies the stored byte prefix. Ambiguous and divergent candidates remain separate and produce diagnostics. Focused checks cover flat archives, multiple matches, unchanged reimports, incomplete-line completion, and replay after source removal.

@@ -129,11 +129,18 @@ class CodexLogReader:
         return [CollectedCodexRecord(*row) for row in rows]
 
 
-def _archive_key(path: str) -> tuple[str, str] | None:
+def _archive_key(path: str) -> tuple[str, str, str] | None:
     parts = Path(path).parts
+    filename = Path(path).name.casefold()
+    if not re.fullmatch(
+        r"rollout-\d{4}-\d{2}-\d{2}t\d{2}-\d{2}-\d{2}-"
+        r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jsonl",
+        filename,
+    ):
+        return None
     for index, part in enumerate(parts):
         if part.casefold() in {"sessions", "archived_sessions"}:
-            return (str(Path(*parts[:index])).casefold(), str(Path(*parts[index + 1:])).casefold())
+            return (str(Path(*parts[:index])).casefold(), part.casefold(), filename)
     return None
 
 
@@ -162,14 +169,17 @@ class CodexLogImporter:
         diagnostics: list[Diagnostic] = []
         for path in self.reader.discover(roots, diagnostics):
             try:
-                self._collect_source(path)
+                warning = self._collect_source(path)
+                if warning:
+                    diagnostics.append(Diagnostic(str(path), None, warning))
             except (OSError, sqlite3.Error, ValueError) as exc:
                 diagnostics.append(Diagnostic(str(path), None, f"Cannot collect source: {exc}"))
         return diagnostics
 
-    def _collect_source(self, path: Path) -> None:
+    def _collect_source(self, path: Path) -> str | None:
         source_path = str(path.resolve())
         connection = self.writer.connection
+        warning = None
         with self.writer.transaction():
             lines = [line.original_line_bytes for line in self.reader.read_source(path)]
             existing = connection.execute(
@@ -178,6 +188,7 @@ class CodexLogImporter:
             log_id = existing[0] if existing else None
             stored = self._lines(log_id) if log_id else []
             if log_id and not _continues(stored, lines):
+                warning = "Source bytes changed or were truncated; retained as a separate log."
                 log_id, stored = None, []
             if not log_id and not existing and lines:
                 key = _archive_key(source_path)
@@ -185,14 +196,25 @@ class CodexLogImporter:
                     "SELECT source_path, log_identity FROM source_paths "
                     "UNION SELECT DISTINCT source_path, log_identity FROM collected_records"
                 ).fetchall()
-                matches = {candidate_id for candidate_path, candidate_id in candidates
-                           if key is not None and _archive_key(candidate_path) == key
-                           and candidate_path.casefold() != source_path.casefold()
-                           and _continues(self._lines(candidate_id), lines)
-                           and self._lines(candidate_id)}
+                matches = set()
+                unresolved = False
+                for candidate_path, candidate_id in candidates:
+                    candidate_key = _archive_key(candidate_path)
+                    if (key is None or candidate_key is None or key[0] != candidate_key[0]
+                            or key[1] == candidate_key[1] or key[2] != candidate_key[2]):
+                        continue
+                    candidate_lines = self._lines(candidate_id)
+                    if candidate_lines and _continues(candidate_lines, lines):
+                        matches.add(candidate_id)
+                    elif candidate_lines:
+                        unresolved = True
                 if len(matches) == 1:
                     log_id = matches.pop()
                     stored = self._lines(log_id)
+                elif len(matches) > 1:
+                    warning = "Multiple archive candidates match; retained as a separate log."
+                elif unresolved:
+                    warning = "Source differs from an archive candidate; retained as a separate log."
             if not log_id:
                 log_id = str(uuid4())
                 self.writer.write("logs", {"log_identity": "log_identity"}, [{"log_identity": log_id}])
@@ -207,6 +229,7 @@ class CodexLogImporter:
             columns = ("record_id", "log_identity", "source_path", "line_number", "original_line_bytes", "collected_at")
             self.writer.write("collected_records", {column: column for column in columns},
                               (asdict(record) for record in records))
+        return warning
 
     def _lines(self, log_id: str) -> list[bytes]:
         rows = self.writer.connection.execute(
