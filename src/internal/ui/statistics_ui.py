@@ -1,7 +1,6 @@
 """Streamlit controls and tables for committed usage measurements."""
 
 from datetime import datetime
-from dataclasses import replace
 
 import pandas as pd
 import plotly.express as px
@@ -59,8 +58,8 @@ def _row(measurement, view=None):
         "Start": measurement.start.isoformat() if measurement.start is not None else None,
         "End": measurement.end.isoformat() if measurement.end is not None else None,
         "Project": measurement.project,
-        "Agent": (measurement.agent or "Default") if view in {"Agent over time", "Agent by project"} else None,
-        "Model": measurement.agent if view == "Model" else None,
+        "Agent": (measurement.agent or "Default") if view in {"Agent over time", "Agent by project over time", "By agent"} else None,
+        "Model": measurement.agent if view in {"Model over time", "By model"} else None,
         "Time": measurement.bucket.isoformat() if measurement.bucket is not None else None,
         "Total tokens": measurement.totals["total_tokens"],
         "Input tokens": measurement.totals["input_tokens"],
@@ -86,26 +85,24 @@ def _name_key(name):
 
 def _measurement_key(measurement, view):
     """Return the prescribed ordering key for a breakdown measurement."""
-    if view in {"Project over time", "Agent over time"}:
-        name = measurement.project if view == "Project over time" else measurement.agent or "Default"
-        return (measurement.bucket is None, measurement.bucket or pd.Timestamp.max, *_name_key(name))
-    if view == "Agent by project":
-        return (*_name_key(measurement.project), *_name_key(measurement.agent or "Default"))
+    if view.endswith("over time"):
+        names = (_name_key(measurement.project) + _name_key(measurement.agent or "Default")
+                 if view == "Agent by project over time" else
+                 _name_key(measurement.project if view == "Project over time" else measurement.agent))
+        return (measurement.bucket is None, measurement.bucket or pd.Timestamp.max, *names)
+    if view == "By project":
+        return _name_key(measurement.project)
     return _name_key(measurement.agent)
 
 
-def render_statistics(writer, calculator, selection, marker, project_keys, selected_agents,
-                      bucket, view, record_ids=None):
-    """Calculate and render both scopes and a selected breakdown."""
+def render_statistics(calculator, selection, marker, project_keys, selected_agents, bucket):
+    """Calculate and render each scope's seven usage breakdowns."""
     request = StatsRequest(start_date=selection.start_date, end_date=selection.end_date,
                            bucket=bucket,
                            marker=marker, projects=project_keys, models=selection.models,
                            roles=selection.agent_roles,
-                           agents=selected_agents,
-                           record_ids=record_ids)
+                           agents=selected_agents)
     result = calculator.calculate(request)
-    full_scope = result["Full selected period"][0]
-    request = replace(request, resolved_start=full_scope.start, resolved_end=full_scope.end)
     export_rows = []
     for scope_index, (scope, (summary, groups)) in enumerate(result.items()):
         st.subheader(scope)
@@ -125,49 +122,53 @@ def render_statistics(writer, calculator, selection, marker, project_keys, selec
         columns[2].metric("Output tokens", _number(summary.totals["output_tokens"]))
         columns[3].metric("Cache percentage", _number(summary.cache_percentage, "%"))
         columns[4].metric("Daily average", _number(summary.average_daily_tokens))
-        extra_columns = st.columns(2)
+        extra_columns = st.columns(4)
         extra_columns[0].metric("Processing speed", "Unknown")
         extra_columns[1].metric("Subagent share", _number(summary.subagent_share, "%"))
+        extra_columns[2].metric("Cached input", _number(summary.totals["cached_input_tokens"]))
+        extra_columns[3].metric("Non-cached input", _number(summary.totals["non_cached_input_tokens"]))
         st.caption(f"Agent threads: {summary.agents:,}")
         st.caption("Legacy intervals crossing a boundary and potentially overlapping agent counters can make coverage partial.")
-        components = [{"Component": label, "Tokens": summary.totals[field]} for label, field in
-                      (("Cached input", "cached_input_tokens"), ("Non-cached input", "non_cached_input_tokens"),
-                       ("Output", "output_tokens"))]
-        if any(item["Tokens"] is not None for item in components):
-            st.plotly_chart(px.bar(pd.DataFrame(components), x="Component", y="Tokens"),
-                            use_container_width=True, key=f"components_{scope_index}")
-        ordered = sorted(groups[view], key=lambda item: _measurement_key(item, view))
-        rows = [_row(item, view) for item in ordered]
-        export_rows.extend(rows)
-        if rows:
-            table = pd.DataFrame(rows)
-            x = {"Project over time": "Time", "Agent over time": "Time", "Agent by project": "Agent",
-                 "Model": "Model"}[view]
-            color = {"Project over time": "Project", "Agent over time": "Agent", "Agent by project": "Project",
-                     "Model": "Model"}[view]
-            if table["Total tokens"].notna().any():
-                chart = table.copy()
-                chart[color] = chart[color].fillna("Unknown")
-                if x == "Time" and chart[x].isna().any():
-                    chart[x] = chart[x].fillna("Unknown")
-                    figure = px.bar(chart, x=x, y="Total tokens", color=color, hover_data=["Coverage"],
-                                    category_orders={x: list(dict.fromkeys(chart[x]))})
+        sections = (
+            ("Token consumption over time", (
+                ("Project over time", "Project over time", "Project"),
+                ("Agent over time", "Agent over time", "Agent"),
+                ("Agent by project over time", "Agent by project over time", "Agent"),
+                ("Model over time", "Model over time", "Model"))),
+            ("Total token consumption", (
+                ("By model", "Model", "Model"),
+                ("By project", "By project", "Project"),
+                ("By agent", "By agent", "Agent"))),
+        )
+        for section, charts in sections:
+            st.subheader(section)
+            for title, group_key, series in charts:
+                st.markdown(f"#### {title}")
+                ordered = sorted(groups[group_key], key=lambda item: _measurement_key(item, title))
+                rows = [_row(item, title) for item in ordered]
+                export_rows.extend(rows)
+                if not rows or not any(row["Total tokens"] is not None for row in rows):
+                    st.info("No plottable usage for this chart.")
+                    continue
+                chart = pd.DataFrame(rows)
+                chart[series] = chart[series].fillna("Unknown")
+                trend = title.endswith("over time")
+                x = "Time" if trend else series
+                kwargs = {}
+                if title == "Agent by project over time":
+                    chart["Project"] = chart["Project"].fillna("Unknown")
+                    kwargs["facet_col"] = "Project"
+                if trend and chart["Time"].isna().any():
+                    chart["Time"] = chart["Time"].fillna("Unknown")
+                    kwargs["category_orders"] = {"Time": list(dict.fromkeys(chart["Time"]))}
+                elif trend:
+                    chart["Time"] = pd.to_datetime(chart["Time"])
+                figure = px.bar(chart, x=x, y="Total tokens", color=series, hover_data=["Coverage"], **kwargs)
+                if trend and "category_orders" in kwargs:
                     figure.update_xaxes(type="category")
-                else:
-                    if x == "Time":
-                        chart[x] = pd.to_datetime(chart[x])
-                    else:
-                        chart[x] = chart[x].fillna("Unknown")
-                    figure = px.bar(chart, x=x, y="Total tokens", color=color, hover_data=["Coverage"])
-                st.plotly_chart(figure,
-                                use_container_width=True, key=f"usage_{scope_index}")
-            st.dataframe(table, hide_index=True, use_container_width=True,
-                         on_select="rerun", selection_mode="multi-column")
-        else:
-            st.info("No usage matches this scope.")
+                st.plotly_chart(figure, use_container_width=True, key=f"usage_{scope_index}_{group_key}")
     columns = {name: name.lower().replace(" ", "_").replace("%", "percentage") for name in
                ("Measurement", "Scope", "Start", "End", "Project", "Agent", "Model", "Time", "Total tokens", "Input tokens",
                 "Output tokens", "Cached input", "Non-cached input", "Cache-write input", "Reasoning output",
                 "Cache %", "Daily average", "Subagent share %", "Coverage", "Agents", "Empty window")}
     st.download_button("Download usage CSV", csv_bytes(export_rows, columns), file_name="usage.csv", mime="text/csv")
-    return request, calculator, result

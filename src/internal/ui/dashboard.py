@@ -78,7 +78,6 @@ def _render(sources, writer, page):
         start, end = _date_limits(preset, date.today())
         refresh_requested = st.button("Refresh sources")
         bucket = st.radio("Time aggregation", ["hourly", "daily", "weekly", "monthly"], index=1, horizontal=True)
-        view = st.selectbox("Usage view", ["Project over time", "Agent over time", "Agent by project", "Model"])
 
     with filters:
         marker = marker_selector(writer)
@@ -151,8 +150,7 @@ def _render(sources, writer, page):
         chosen_pairs = {(row["session_id"], row["thread_id"]) for row in chosen_threads}
         selected = selected.loc[[pair in chosen_pairs for pair in zip(selected["session"], selected["agent"])]].copy()
     render_statistics(
-        writer, report_calculator, selection, marker, project_keys, selected_agents,
-        bucket, view
+        report_calculator, selection, marker, project_keys, selected_agents, bucket
     )
     if selected.empty:
         st.info("No observed events match the selected filters.")
