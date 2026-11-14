@@ -16,7 +16,7 @@ classDiagram
     CodexLogImporter *-- DatabaseWriter : one writer
 ```
 
-Register [`CodexAgentThread`](./010-usage-data-model.md#codexagentthread) and [`CodexUsage`](./010-usage-data-model.md#codexusage) through the same transformation interface and share identity rules and parsing helpers. Parsers may consult multiple records for identity, turn context, or legacy deltas. The writer provides transaction operations, and the importer sets publication boundaries. Keep schema definitions and versioned upgrades with the model's SQLite setup. See [collection and rebuild](./000-system-overview.md).
+Register [`CodexAgentThread`](./010-usage-data-model.md#codexagentthread) and [`CodexUsage`](./010-usage-data-model.md#codexusage) through the same transformation interface and share identity rules and parsing helpers. Parsing is independent of SQLite and the dashboard. Parsers may consult multiple records for identity, turn context, or legacy deltas. Use the same resolved owner for usage accounting and agent hierarchy. The writer provides transaction operations, and the importer sets publication boundaries. Keep schema definitions and versioned upgrades with the model's SQLite setup. See [collection and rebuild](./000-system-overview.md).
 
 ## Statistics classes
 
@@ -36,14 +36,4 @@ classDiagram
     UsageCalculator <|.. AgentUsageByProjectCalculator
 ```
 
-Use shared rules for token totals, overlap, coverage, weighted cache percentage, and daily averages. Calculate window summaries directly from eligible rows. Clip time buckets to the reporting window. Mark empty windows explicitly and keep unknown amounts distinct from zero. Coverage can be complete, partial, or unknown. See [reporting windows](../../codex-usage-analyzer.md#63-visualizations).
-
-## Existing code
-
-| Component | Responsibility |
-| --- | --- |
-| `parser.py` and `Event` | Parse and normalize timestamps, IDs, counters, context, and relationships independently of SQLite and the dashboard. |
-| `analytics.py` and `agents.py` | Normalize usage, calculate deltas, and resolve threads in functions. Extend `Increment` with response counts, legacy deltas, and provenance. Use the resolved `Agent` identity for accounting and hierarchy. |
-| `metrics.py`, `Filters`, and `Metrics` | Reuse filtering and coverage-aware aggregation. Dashboard and export use the same measurements. |
-| `app.py` and `dashboard.py` | Compose the importer and calculators, run collection and rebuild on refresh, show committed results and diagnostics, and manage saved markers. |
-| Annotation storage | Retains session labels and other user metadata. |
+Use shared rules for token totals, overlap, coverage, weighted cache percentage, and daily averages. Dashboard and export use the same measurements. Calculate window summaries directly from eligible rows. Clip time buckets to the reporting window. Mark empty windows explicitly and keep unknown amounts distinct from zero. Coverage can be complete, partial, or unknown. See [reporting windows](../../codex-usage-analyzer.md#63-visualizations).
