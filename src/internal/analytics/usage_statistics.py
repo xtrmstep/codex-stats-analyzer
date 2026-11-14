@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
-import json
 import sqlite3
 from uuid import uuid4
 
@@ -24,7 +23,6 @@ class TimeMarker:
     marker_id: str
     name: str
     timestamp: str
-    session_ids: frozenset[str] | None = None
 
 
 @dataclass(frozen=True)
@@ -67,14 +65,12 @@ class UsageMeasurement:
 
 def list_markers(connection: sqlite3.Connection) -> list[TimeMarker]:
     """Read saved markers in name order."""
-    return [TimeMarker(marker_id, name, timestamp, frozenset(json.loads(sessions)) if sessions is not None else None)
-            for marker_id, name, timestamp, sessions in connection.execute(
-        "SELECT marker_id, name, timestamp, session_ids FROM time_markers ORDER BY name COLLATE NOCASE, marker_id"
+    return [TimeMarker(*row) for row in connection.execute(
+        "SELECT marker_id, name, timestamp FROM time_markers ORDER BY name COLLATE NOCASE, marker_id"
     )]
 
 
-def save_marker(writer, name: str, timestamp: str, marker_id: str | None = None,
-                session_ids: frozenset[str] | None = None) -> TimeMarker:
+def save_marker(writer, name: str, timestamp: str, marker_id: str | None = None) -> TimeMarker:
     """Create or edit one marker using the generic writer transaction."""
     name = name.strip()
     if not name:
@@ -82,15 +78,13 @@ def save_marker(writer, name: str, timestamp: str, marker_id: str | None = None,
     stamp = pd.Timestamp(timestamp)
     if pd.isna(stamp) or stamp.tzinfo is None:
         raise ValueError("Marker timestamp must include a time zone.")
-    if session_ids is not None and not session_ids:
-        raise ValueError("Select at least one chat.")
-    marker = TimeMarker(marker_id or str(uuid4()), name, timestamp, session_ids)
+    marker = TimeMarker(marker_id or str(uuid4()), name, timestamp)
     if marker_id and not writer.connection.execute(
         "SELECT 1 FROM time_markers WHERE marker_id = ?", (marker_id,)
     ).fetchone():
         raise ValueError("Marker no longer exists.")
     with writer.transaction():
-        values = {**vars(marker), "session_ids": json.dumps(sorted(session_ids)) if session_ids is not None else None}
+        values = vars(marker)
         writer.write("time_markers", {key: key for key in values}, [values], ("marker_id",))
     return marker
 
@@ -356,7 +350,6 @@ class StatsCalculation:
             scopes.append((f"Since {request.marker.name}", cutoff, display_start))
         result = {}
         for scope, cutoff, display_start in scopes:
-            scoped_sessions = request.marker.session_ids if request.marker and scope != "Full selected period" else None
             empty = cutoff is not None and effective_end is not None and cutoff >= effective_end
             if cutoff is not None and request.end_date is not None:
                 # Every recorded offset defines its own exclusive end of the
@@ -369,8 +362,6 @@ class StatsCalculation:
             cutoff_key = _instant(request.marker.timestamp) if request.marker and scope != "Full selected period" else (_instant(start.isoformat()) if start is not None else None)
             window = []
             for original in selected:
-                if scoped_sessions is not None and original["session_id"] not in scoped_sessions:
-                    continue
                 row = original.copy()
                 observed_at = row["observed"]
                 if (cutoff_key is not None and (row["observed_key"] is None or row["observed_key"] < cutoff_key)) or (end is not None and (observed_at is None or observed_at >= end)):
@@ -402,8 +393,6 @@ class StatsCalculation:
             if not empty:
                 observed_agents = {row["execution_id"] for row in window if row["execution_id"]}
                 for session_id, execution_id, stamp, stamp_key in observations:
-                    if scoped_sessions is not None and session_id not in scoped_sessions:
-                        continue
                     if (cutoff_key is not None and (stamp_key is None or stamp_key < cutoff_key)) or (end is not None and (stamp is None or stamp >= end)):
                         continue
                     observed_agents.add(execution_id)

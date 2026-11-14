@@ -26,7 +26,7 @@ This section presents the aggregated statistics for the selected time range and 
 
 ### 1.2.2 Manual annotations
 
-This section allows users to create manual events and configure how those events contribute to aggregate stats. The user can define whether an event should include all stats or only selected chats, along with other event-level configuration.
+This section allows users to create, edit, and delete named time markers. Markers have a timestamp and apply across chats.
 
 ## 1.3 Navigation behavior
 

@@ -30,21 +30,14 @@ def marker_editor(writer):
     choice = st.selectbox("Marker to edit", ["Create new marker"] + list(by_id),
                           format_func=lambda key: by_id[key].name if key in by_id else key)
     selected = by_id.get(choice)
-    available = {row[0] for row in writer.connection.execute("SELECT DISTINCT session_id FROM agent_threads")}
-    saved = selected.session_ids if selected and selected.session_ids is not None else frozenset()
     with st.form("marker_editor"):
         name = st.text_input("Name", value=selected.name if selected else "")
         timestamp = st.text_input("Timestamp with time zone",
                                   value=selected.timestamp if selected else st.session_state["new_marker_default_timestamp"])
-        scope = st.radio("Chat scope", ["All chats", "Selected chats"],
-                         index=1 if selected and selected.session_ids is not None else 0)
-        sessions = st.multiselect("Chats", sorted(available | set(saved)), default=sorted(saved),
-                                  format_func=lambda item: item if item in available else f"{item} (unavailable)")
         save = st.form_submit_button("Save marker")
     if save:
         try:
-            save_marker(writer, name, timestamp, selected.marker_id if selected else None,
-                        frozenset(sessions) if scope == "Selected chats" else None)
+            save_marker(writer, name, timestamp, selected.marker_id if selected else None)
             st.rerun()
         except (ValueError, OverflowError) as exc:
             st.error(str(exc))
