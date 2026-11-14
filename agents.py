@@ -82,7 +82,8 @@ def analyze_agents(root_id: str, events: list[Event], increments: list[Increment
     calls: dict[tuple[str, str], tuple[str, dict]] = {}
     outputs: list[tuple[str, str, dict, str]] = []
     for event in events:
-        agent = agents.setdefault(event.session_id, Agent(event.session_id))
+        agent_id = event.thread_id or event.session_id
+        agent = agents.setdefault(agent_id, Agent(agent_id))
         for attr, value in (("model", event.model), ("role", event.agent_role), ("nickname", event.agent_nickname)):
             if value:
                 setattr(agent, attr, value)
@@ -205,13 +206,13 @@ def analyze_agents(root_id: str, events: list[Event], increments: list[Increment
         agent.activity = Activity(points[0][1] if points else None, points[-1][1] if points else None,
                                   points[0][2] if points else None, points[-1][2] if points else None,
                                   *(interval or (None, None, None)))
-        totals = aggregate([i for i in increments if i.session_id == agent_id])
+        totals = aggregate([i for i in increments if (i.thread_id or i.session_id) == agent_id])
         agent.tokens = totals["total_tokens"]
         agent.cache_percentage = totals["cache_percentage"]
     main = agents[root_id].tokens if root_id in agents else Total(None, False)
     child_ids = set(depths) - {root_id}
-    child_increments = [i for i in increments if i.session_id in child_ids]
-    stream_ids = {increment.session_id for increment in child_increments}
+    child_increments = [i for i in increments if (i.thread_id or i.session_id) in child_ids]
+    stream_ids = {increment.thread_id or increment.session_id for increment in child_increments}
     nested_streams = False
     for child in stream_ids:
         ancestor = agents[child].parent_id
@@ -228,7 +229,7 @@ def analyze_agents(root_id: str, events: list[Event], increments: list[Increment
            aggregate(child_increments)["total_tokens"] if child_ids else Total(None, False))
     if nested_streams:
         diagnostics.append("Nested agent counter scopes may overlap; combined subagent tokens are unknown.")
-    if child_ids and (any(not any(i.session_id == child for i in child_increments) for child in child_ids)):
+    if child_ids and (any(not any((i.thread_id or i.session_id) == child for i in child_increments) for child in child_ids)):
         sub = Total(sub.value, False)
     # Parent counters may already include child counters, so a combined share
     # is not meaningful until their counter scope is established.

@@ -50,7 +50,7 @@ class DatabaseWriter:
 
     def _initialize_schema(self) -> None:
         version = self.connection.execute("PRAGMA user_version").fetchone()[0]
-        if version > 1:
+        if version > 2:
             raise ValueError(f"Unsupported database schema version: {version}")
         if version == 0:
             with self.connection:
@@ -67,6 +67,28 @@ class DatabaseWriter:
                     "UNIQUE(log_identity, line_number))"
                 )
                 self.connection.execute("PRAGMA user_version = 1")
+            version = 1
+        if version == 1:
+            with self.connection:
+                self.connection.execute(
+                    "CREATE TABLE IF NOT EXISTS agent_threads ("
+                    "execution_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, thread_id TEXT NOT NULL, "
+                    "parent_execution_id TEXT, agent_name TEXT, role TEXT, nickname TEXT)"
+                )
+                self.connection.execute(
+                    "CREATE TABLE IF NOT EXISTS usage_records ("
+                    "usage_id TEXT PRIMARY KEY, source_record_id TEXT NOT NULL REFERENCES collected_records(record_id), "
+                    "execution_id TEXT REFERENCES agent_threads(execution_id), observed_at TEXT, prior_observed_at TEXT, "
+                    "source_working_directory TEXT, project_key TEXT, project_label TEXT, model TEXT, "
+                    "input_tokens INTEGER, output_tokens INTEGER, cached_input_tokens INTEGER, "
+                    "cache_write_input_tokens INTEGER, reasoning_output_tokens INTEGER, total_tokens INTEGER, "
+                    "non_cached_input_tokens INTEGER, coverage TEXT NOT NULL, counter_provenance TEXT NOT NULL)"
+                )
+                self.connection.execute(
+                    "CREATE TABLE IF NOT EXISTS coverage_diagnostics ("
+                    "source_record_id TEXT, execution_id TEXT, observed_at TEXT, message TEXT NOT NULL)"
+                )
+                self.connection.execute("PRAGMA user_version = 2")
 
     @contextmanager
     def transaction(self):
@@ -159,10 +181,15 @@ def _continues(stored: list[bytes], current: list[bytes]) -> bool:
 class CodexLogImporter:
     """Collect source files transactionally into a local raw-record store."""
 
-    def __init__(self, reader: CodexLogReader, writer: DatabaseWriter, transformations=()):
+    def __init__(self, reader: CodexLogReader, writer: DatabaseWriter, transformations=None):
         self.reader = reader
         self.writer = writer
+        if transformations is None:
+            from transformations import AgentThreadTransformation, UsageTransformation
+            transformations = (AgentThreadTransformation(), UsageTransformation())
         self.transformations = tuple(transformations)
+        if not self.transformations:
+            raise ValueError("At least one transformation is required.")
 
     def collect(self, roots: list[Path]) -> list[Diagnostic]:
         """Collect each available source, returning read and write diagnostics."""
@@ -173,7 +200,7 @@ class CodexLogImporter:
                 if warning:
                     diagnostics.append(Diagnostic(str(path), None, warning))
             except (OSError, sqlite3.Error, ValueError) as exc:
-                diagnostics.append(Diagnostic(str(path), None, f"Cannot collect source: {exc}"))
+                diagnostics.append(Diagnostic(str(path), None, f"Cannot collect source: {exc}", fatal=True))
         return diagnostics
 
     def _collect_source(self, path: Path) -> str | None:
@@ -236,3 +263,39 @@ class CodexLogImporter:
             "SELECT original_line_bytes FROM collected_records WHERE log_identity = ? ORDER BY line_number", (log_id,)
         )
         return [row[0] for row in rows]
+
+    def refresh(self, roots: list[Path]) -> tuple[bool, list[Diagnostic]]:
+        """Collect sources and publish a rebuild only after successful collection."""
+        diagnostics = self.collect(roots)
+        if any(item.fatal for item in diagnostics):
+            return False, diagnostics
+        success, rebuild_diagnostics = self.rebuild()
+        return success, diagnostics + rebuild_diagnostics
+
+    def rebuild(self) -> tuple[bool, list[Diagnostic]]:
+        """Atomically publish transformations from a committed raw snapshot."""
+        connection = self.writer.connection
+        try:
+            with self.writer.transaction():
+                connection.execute("PRAGMA defer_foreign_keys = ON")
+                records = self.reader.replay(connection)
+                outputs = []
+                coverage = []
+                for transformation in self.transformations:
+                    rows, diagnostics = transformation.transform(records)
+                    rows = list(rows)
+                    if not all(isinstance(row, transformation.record_type) for row in rows):
+                        raise TypeError("Transformation returned an unexpected record type.")
+                    table, mapping = transformation.destination
+                    outputs.append((table, mapping, [asdict(row) for row in rows]))
+                    coverage.extend(diagnostics)
+                for table, _, _ in reversed(outputs):
+                    connection.execute(f"DELETE FROM {_identifier(table)}")
+                connection.execute("DELETE FROM coverage_diagnostics")
+                for table, mapping, rows in outputs:
+                    self.writer.write(table, mapping, rows)
+                columns = ("source_record_id", "execution_id", "observed_at", "message")
+                self.writer.write("coverage_diagnostics", {column: column for column in columns}, coverage)
+            return True, []
+        except Exception as exc:
+            return False, [Diagnostic(str(self.writer.database_path), None, f"Cannot rebuild usage: {exc}", fatal=True)]

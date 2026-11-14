@@ -1,7 +1,7 @@
 """Read-only discovery and normalization of Codex session JSONL files."""
 
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import hashlib
 import json
 from pathlib import Path
@@ -15,6 +15,7 @@ class Diagnostic:
     source: str
     line: int | None
     message: str
+    fatal: bool = False
 
 
 @dataclass(frozen=True)
@@ -36,6 +37,11 @@ class Event:
     agent_nickname: str | None = None
     token_counters: dict[str, Any] | None = None
     evidence: dict[str, Any] | None = None
+    thread_id: str | None = None
+    turn_id: str | None = None
+    response_id: str | None = None
+    record_id: str | None = None
+    repository_url: str | None = None
 
 
 @dataclass
@@ -56,7 +62,7 @@ def discover_files(roots: list[Path], diagnostics: list[Diagnostic]) -> list[Pat
             continue
         try:
             def on_error(error: OSError) -> None:
-                diagnostics.append(Diagnostic(str(error.filename or root), None, f"Cannot enumerate directory: {error.strerror}"))
+                diagnostics.append(Diagnostic(str(error.filename or root), None, f"Cannot enumerate directory: {error.strerror}", fatal=True))
 
             import os
             for directory, _, files in os.walk(root, onerror=on_error, followlinks=False):
@@ -65,7 +71,7 @@ def discover_files(roots: list[Path], diagnostics: list[Diagnostic]) -> list[Pat
                         path = Path(directory) / name
                         found.setdefault(os.path.normcase(str(path.resolve())), path)
         except OSError as exc:
-            diagnostics.append(Diagnostic(str(root), None, f"Cannot enumerate directory: {exc}"))
+            diagnostics.append(Diagnostic(str(root), None, f"Cannot enumerate directory: {exc}", fatal=True))
     return sorted(found.values(), key=lambda path: str(path).casefold())
 
 
@@ -211,6 +217,91 @@ def ingest(roots: list[Path]) -> IngestionResult:
             result.events.append(event)
             if raw.get("type") not in supported:
                 result.diagnostics.append(Diagnostic(str(path), number, f"Unsupported event type: {event.event_type}."))
+    return result
+
+
+def parse_collected(records) -> IngestionResult:
+    """Normalize an ordered snapshot of collected lines without source files.
+
+    Args:
+        records: Collected records ordered by log identity and line number.
+
+    Returns:
+        Events retaining their source record and legacy reference, with diagnostics.
+    """
+    result = IngestionResult()
+    logs: dict[str, list] = {}
+    for record in records:
+        logs.setdefault(record.log_identity, []).append(record)
+    supported = {"session_meta", "turn_context", "event_msg", "response_item", "token_usage_record"}
+    for entries in logs.values():
+        parsed = []
+        sessions, threads = set(), set()
+        metadata: dict[str, str] = {}
+        for record in entries:
+            try:
+                raw = json.loads(record.original_line_bytes.decode("utf-8-sig"))
+                if not isinstance(raw, dict) or not _string(raw.get("type")):
+                    raise ValueError("event is not an object with a type")
+                canonical = json.dumps(raw, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+                canonical.encode("utf-8")
+            except (UnicodeError, ValueError, TypeError) as exc:
+                result.diagnostics.append(Diagnostic(record.source_path, record.line_number, f"Invalid or incomplete event: {exc}"))
+                continue
+            parsed.append((record, raw, canonical))
+            payload = raw.get("payload") if isinstance(raw.get("payload"), dict) else {}
+            if raw["type"] == "session_meta":
+                session = _string(payload.get("session_id")) or _string(payload.get("id"))
+                thread = _string(payload.get("id"))
+                if session:
+                    sessions.add(session)
+                if thread:
+                    threads.add(thread)
+                source = payload.get("source")
+                subagent = source.get("subagent") if isinstance(source, dict) else None
+                spawn = subagent.get("thread_spawn") if isinstance(subagent, dict) else None
+                if isinstance(spawn, dict):
+                    for key in ("parent_thread_id", "agent_role", "agent_nickname"):
+                        if _string(spawn.get(key)):
+                            metadata[key] = spawn[key]
+                if _string(payload.get("parent_thread_id")):
+                    metadata["parent_thread_id"] = payload["parent_thread_id"]
+        source = entries[0].source_path
+        session = next(iter(sessions)) if len(sessions) == 1 else f"filename:{Path(source).name}"
+        owner = next(iter(threads)) if len(threads) == 1 else None
+        if len(sessions) != 1 or len(threads) != 1:
+            result.diagnostics.append(Diagnostic(source, None, "Missing or conflicting source identity; ownership may be unknown."))
+        occurrences: Counter[str] = Counter()
+        for record, raw, canonical in parsed:
+            digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+            occurrences[digest] += 1
+            payload = raw.get("payload") if isinstance(raw.get("payload"), dict) else {}
+            native_id = _string(raw.get("id")) or _string(payload.get("id")) or ""
+            identity = json.dumps([session, native_id, digest, occurrences[digest]], ensure_ascii=False)
+            reference = hashlib.sha256(identity.encode("utf-8")).hexdigest()
+            event = _normalize(raw, session, Path(record.source_path), record.line_number, reference, metadata)
+            explicit_thread = _string(payload.get("thread_id")) if raw["type"] == "token_usage_record" else None
+            explicit_agent = _string(payload.get("agent_id")) if raw["type"] == "token_usage_record" else None
+            if explicit_thread and explicit_agent and explicit_thread != explicit_agent:
+                thread = None
+                result.diagnostics.append(Diagnostic(record.source_path, record.line_number, "Conflicting token owner IDs."))
+            else:
+                thread = explicit_thread or explicit_agent or owner
+            token_session = _string(payload.get("session_id")) if raw["type"] == "token_usage_record" else None
+            if token_session and len(sessions) == 1 and token_session != session and thread == owner:
+                thread = None
+                result.diagnostics.append(Diagnostic(record.source_path, record.line_number, "Token session conflicts with source metadata; ownership withheld."))
+            event_session = token_session or session
+            event = replace(event, session_id=event_session, agent_id=thread, thread_id=thread,
+                            turn_id=_string(payload.get("turn_id")),
+                            response_id=_string(payload.get("response_id")), record_id=record.record_id,
+                            repository_url=_string(payload.get("git", {}).get("repository_url"))
+                            if isinstance(payload.get("git"), dict) else None)
+            if thread is None or thread != owner:
+                event = replace(event, parent_agent_id=None, agent_role=None, agent_nickname=None)
+            result.events.append(event)
+            if raw["type"] not in supported:
+                result.diagnostics.append(Diagnostic(record.source_path, record.line_number, f"Unsupported event type: {event.event_type}."))
     return result
 
 
