@@ -23,6 +23,7 @@ class CodexAgentThread:
     agent_name: str | None
     role: str | None
     nickname: str | None
+    chat_title: str | None = None
 
 
 @dataclass(frozen=True)
@@ -205,6 +206,61 @@ class AgentThreadTransformation(CodexRecordTransformation):
         """Return the threads observed in the supplied snapshot."""
         events, _ = _events(records)
         return _threads(events)
+
+
+def assign_chat_titles(threads, records, evidence, diagnostics):
+    """Attach index titles only through positively identified root ancestry.
+
+    Equal newest timestamps with different titles are ambiguous. An index
+    entry alone never establishes that an execution is a conversation root.
+    """
+    latest = {}
+    for thread_id, title, updated in evidence:
+        stamp = _timestamp(updated)
+        if stamp is None:
+            continue
+        previous = latest.get(thread_id)
+        if previous is None or stamp > previous[0]:
+            latest[thread_id] = (stamp, {title})
+        elif stamp == previous[0]:
+            previous[1].add(title)
+
+    uncertain = {item.get("execution_id") for item in diagnostics if item.get("kind") == "hierarchy"
+                 and item.get("execution_id")}
+    roots = set()
+    for record in records:
+        try:
+            raw = json.loads(record.original_line_bytes.decode("utf-8-sig"))
+            if not isinstance(raw, dict):
+                continue
+            payload = raw.get("payload", {})
+            if raw.get("type") != "session_meta" or not isinstance(payload, dict):
+                continue
+            thread = payload.get("id")
+            session = payload.get("session_id") or thread
+            source = payload.get("source")
+            is_subagent = isinstance(source, dict) and "subagent" in source
+            if (isinstance(thread, str) and thread and thread == session and not is_subagent
+                    and not payload.get("parent_thread_id") and not payload.get("parent_agent_id")):
+                roots.add(_execution_id(session, thread))
+        except (UnicodeError, ValueError, TypeError):
+            continue
+    by_id = {row["execution_id"]: row for row in threads}
+    for row in threads:
+        row["chat_title"] = None
+        current = row["execution_id"]
+        seen = set()
+        while current in by_id and current not in seen and current not in uncertain:
+            seen.add(current)
+            node = by_id[current]
+            parent = node["parent_execution_id"]
+            if parent is None:
+                if current in roots:
+                    candidate = latest.get(node["thread_id"])
+                    if candidate and len(candidate[1]) == 1:
+                        row["chat_title"] = next(iter(candidate[1]))
+                break
+            current = parent
 
 
 def _project(directory, repository_url):

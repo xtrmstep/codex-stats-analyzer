@@ -12,3 +12,10 @@ Associate imported agent threads with their chat title
 
 - A root and its subagents resolve to the same chat title. A subagent's index entry does not override its root's chat title. Two chats with the same title retain distinct identities.
 - Refresh picks up a valid rename for the whole chat. SQLite-only rebuild reproduces the title from retained evidence. Missing or conflicting title evidence leaves titles unknown without affecting token metrics.
+
+## Issue Logs
+
+### Failed check 1
+- `src/internal/ingestion/transformations.py` assumes every valid JSON line is an object when identifying roots; a JSON array or scalar would raise an exception and block publication.
+- Malformed or unsupported log records must remain nonfatal and must not prevent usage import.
+- Ignore non-object lines during root identification, then verify publication with such records and a malformed index entry.

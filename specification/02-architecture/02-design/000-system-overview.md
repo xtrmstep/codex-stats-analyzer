@@ -22,7 +22,7 @@ Collection and reporting run in the same application process and share one local
 
 ## Data sources
 
-Read JSONL files from `%USERPROFILE%\.codex\sessions`, `%USERPROFILE%\.codex\archived_sessions`, and additional configured directories. Extract session identity, project path, timestamps, model and reasoning effort, agent identity and available parent, role and nickname, token counters, coordination events, and recorded skill invocations. Use event evidence to identify skill or subagent activity. Conversation text alone is insufficient.
+Read JSONL files from `%USERPROFILE%\.codex\sessions`, `%USERPROFILE%\.codex\archived_sessions`, and additional configured directories. Extract session identity, project path, timestamps, model and reasoning effort, agent identity and available parent, role and nickname, token counters, coordination events, and recorded skill invocations. Read the Codex `session_index.jsonl` separately for chat titles, retaining index evidence for SQLite-only rebuilds. Resolve titles from the positively identified root thread and propagate them through verified parent links; missing or conflicting evidence leaves the title unknown. Use event evidence to identify skill or subagent activity. Conversation text alone is insufficient.
 
 ## Component behavior
 

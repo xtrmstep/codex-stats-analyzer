@@ -7,7 +7,7 @@ SQLite stores the first four classes. Requests and measurements live in memory f
 | Class | Description |
 | --- | --- |
 | <a name="collectedcodexrecord"></a>`CollectedCodexRecord` | Preserves one JSONL line byte for byte, including any terminator. |
-| <a name="codexagentthread"></a>`CodexAgentThread` | Identifies an execution by separate session and thread IDs, with an optional verified parent. |
+| <a name="codexagentthread"></a>`CodexAgentThread` | Identifies an execution by separate session and thread IDs, with an optional verified parent and root-derived chat title. |
 | <a name="codexusage"></a>`CodexUsage` | Records token counts for a response or legacy counter delta. |
 | <a name="timemarker"></a>`TimeMarker` | Stores a named timestamp with no chat criterion across rebuilds and schema upgrades. |
 | <a name="statsrequest"></a>`StatsRequest` | Carries report filters, time range, and grouping settings. |
@@ -33,6 +33,7 @@ classDiagram
         thread_id
         parent_execution_id
         agent_name, role, nickname
+        chat_title
     }
     class CodexUsage {
         usage_id

@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime
 import hashlib
+import json
 from pathlib import Path
 import re
 import sqlite3
@@ -53,7 +54,7 @@ class DatabaseWriter:
     def _initialize_schema(self) -> None:
         with self.transaction():
             version = self.connection.execute("PRAGMA user_version").fetchone()[0]
-            if version > 6:
+            if version > 7:
                 raise ValueError(f"Unsupported database schema version: {version}")
             if version == 0:
                 self.connection.execute("CREATE TABLE IF NOT EXISTS logs (log_identity TEXT PRIMARY KEY)")
@@ -126,6 +127,11 @@ class DatabaseWriter:
             if version == 5:
                 self.connection.execute("ALTER TABLE time_markers ADD COLUMN session_ids TEXT")
                 self.connection.execute("PRAGMA user_version = 6")
+                version = 6
+            if version == 6:
+                self.connection.execute("ALTER TABLE agent_threads ADD COLUMN chat_title TEXT")
+                self.connection.execute("CREATE TABLE chat_title_evidence (thread_id TEXT NOT NULL, title TEXT NOT NULL, updated_at TEXT NOT NULL)")
+                self.connection.execute("PRAGMA user_version = 7")
 
     @contextmanager
     def transaction(self):
@@ -172,7 +178,7 @@ class CodexLogReader:
 
     def discover(self, roots: list[Path], diagnostics: list[Diagnostic]) -> list[Path]:
         """Discover source files while reporting inaccessible directories."""
-        return discover_files(roots, diagnostics)
+        return [path for path in discover_files(roots, diagnostics) if path.name.casefold() != "session_index.jsonl"]
 
     def read_source(self, path: Path) -> list[SourceLine]:
         """Read positioned lines with their original bytes."""
@@ -244,9 +250,10 @@ def _continues(stored: list[bytes], current: list[bytes]) -> bool:
 class CodexLogImporter:
     """Collect source files transactionally into a local raw-record store."""
 
-    def __init__(self, reader: CodexLogReader, writer: DatabaseWriter, transformations=None):
+    def __init__(self, reader: CodexLogReader, writer: DatabaseWriter, transformations=None, index_path=None):
         self.reader = reader
         self.writer = writer
+        self.index_path = Path(index_path) if index_path is not None else Path.home() / ".codex" / "session_index.jsonl"
         if transformations is None:
             from internal.ingestion.transformations import AgentThreadTransformation, UsageTransformation
             transformations = (AgentThreadTransformation(), UsageTransformation())
@@ -264,6 +271,36 @@ class CodexLogImporter:
                     diagnostics.append(Diagnostic(str(path), None, warning))
             except (OSError, sqlite3.Error, ValueError) as exc:
                 diagnostics.append(Diagnostic(str(path), None, f"Cannot collect source: {exc}", fatal=True))
+        diagnostics.extend(self._collect_index())
+        return diagnostics
+
+    def _collect_index(self):
+        """Retain a readable snapshot of valid title evidence independently of logs."""
+        from internal.analytics.token_accounting import _timestamp
+
+        try:
+            lines = self.index_path.read_bytes().splitlines()
+        except FileNotFoundError:
+            return []
+        except OSError as exc:
+            return [Diagnostic(str(self.index_path), None, f"Cannot read chat index: {exc}")]
+        rows, diagnostics = [], []
+        for number, line in enumerate(lines, 1):
+            try:
+                item = json.loads(line.decode("utf-8-sig"))
+                thread, title, updated = item["id"], item["thread_name"], item["updated_at"]
+                if (not isinstance(thread, str) or not thread.strip() or not isinstance(title, str)
+                        or not title.strip() or not isinstance(updated, str) or _timestamp(updated) is None):
+                    raise ValueError("invalid chat title entry")
+                rows.append((thread, title, updated))
+            except (UnicodeError, ValueError, TypeError, KeyError):
+                diagnostics.append(Diagnostic(str(self.index_path), number, "Invalid chat title entry ignored."))
+        try:
+            with self.writer.transaction():
+                self.writer.connection.execute("DELETE FROM chat_title_evidence")
+                self.writer.connection.executemany("INSERT INTO chat_title_evidence (thread_id, title, updated_at) VALUES (?, ?, ?)", rows)
+        except sqlite3.Error as exc:
+            diagnostics.append(Diagnostic(str(self.index_path), None, f"Cannot retain chat titles: {exc}"))
         return diagnostics
 
     def _collect_source(self, path: Path) -> str | None:
@@ -353,6 +390,11 @@ class CodexLogImporter:
                     outputs.append((table, mapping, [asdict(row) for row in rows]))
                     coverage.extend({**item, "kind": "hierarchy" if table == "agent_threads" else "usage"}
                                     for item in diagnostics)
+                from internal.ingestion.transformations import assign_chat_titles
+                for table, _, rows in outputs:
+                    if table == "agent_threads":
+                        evidence = connection.execute("SELECT thread_id, title, updated_at FROM chat_title_evidence").fetchall()
+                        assign_chat_titles(rows, records, evidence, coverage)
                 for table, _, _ in reversed(outputs):
                     connection.execute(f"DELETE FROM {_identifier(table)}")
                 connection.execute("DELETE FROM coverage_diagnostics")
