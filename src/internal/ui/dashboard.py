@@ -15,6 +15,7 @@ from internal.ingestion.collection import CodexLogImporter, CodexLogReader, Data
 from internal.ui.statistics_ui import display_timezone, marker_editor, marker_selector, render_statistics
 from internal.analytics.usage_statistics import StatsCalculation
 from internal.ui.exports import csv_bytes, SESSION_COLUMNS
+from internal.ui.session_comparisons import render_session_comparisons
 
 
 def _display(total, suffix=""):
@@ -161,6 +162,7 @@ def _render(sources, writer, page, start, end, range_ready):
                 root = st.selectbox("Root agent", roots)
                 details(root, selected, parsed.events, accounting.increments, start is not None or end is not None,
                         report_calculator, replace(report_request, sessions=frozenset({session_id}), marker=None))
+    render_session_comparisons(report_calculator, report_request, selected)
     with st.expander(f"Parsing and accounting diagnostics ({len(parsed.diagnostics) + len(accounting.diagnostics)})"):
         for item in parsed.diagnostics:
             st.write(f"{item.source}:{item.line or '-'} — {item.message}")
