@@ -5,10 +5,10 @@ from datetime import date, timedelta
 
 import pandas as pd
 
-from analytics import Increment, Total, aggregate
-from agents import analyze_agents
-from parser import Event
-from labels import assigned, matches
+from internal.analytics.token_accounting import Increment, Total, aggregate
+from internal.analytics.agents import analyze_agents
+from internal.ingestion.parser import Event
+from internal.metadata.labels import assigned, matches
 
 
 @dataclass(frozen=True)

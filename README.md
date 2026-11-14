@@ -6,6 +6,8 @@ A local Windows dashboard for inspecting Codex session activity, token counters,
 
 Install Python 3.12 for Windows with the Python launcher, then run `setup.bat`. It creates a project-local `.venv` and installs Streamlit, pandas and Plotly. Run `run.bat` from any working directory, including a path containing spaces. The dashboard listens at [http://localhost:8501](http://localhost:8501), binds to localhost, and disables Streamlit usage telemetry and its email prompt.
 
+The entry point is `src/app.py`. The `src/internal/` packages contain ingestion, analytics, metadata and dashboard code. Configuration and local data remain in the repository root.
+
 For installation without network access, first prepare compatible Python 3.12 Windows wheels, including transitive dependencies, on a connected machine with the same target architecture:
 
 ```bat
@@ -16,7 +18,7 @@ Transfer the wheelhouse to the target machine and run `setup.bat "C:\path to\whe
 
 ## Sources and refresh
 
-`config.toml` lists source directories under `[sources].directories`; the defaults are `%USERPROFILE%\.codex\sessions` and `%USERPROFILE%\.codex\archived_sessions`. Add directories as TOML literal strings. Windows `%VARIABLE%` references are expanded and relative paths resolve from the project directory. Missing directories are reported. Run `.venv\Scripts\python.exe app.py --check-config` to check the configuration.
+`config.toml` lists source directories under `[sources].directories`; the defaults are `%USERPROFILE%\.codex\sessions` and `%USERPROFILE%\.codex\archived_sessions`. Add directories as TOML literal strings. Windows `%VARIABLE%` references are expanded and relative paths resolve from the project directory. Missing directories are reported. Run `.venv\Scripts\python.exe src\app.py --check-config` to check the configuration.
 
 Use **Refresh sources** to reread local files and recalculate analytics and saved comparisons. Parsing diagnostics include malformed and incomplete lines. Unavailable annotated sessions and run boundaries are reported without deleting metadata. Session/event references generally survive appends and archive moves; files with no session ID use their filename as a fallback, so renaming them changes that identity.
 

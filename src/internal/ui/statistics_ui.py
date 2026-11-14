@@ -8,8 +8,8 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from exports import csv_bytes
-from usage_statistics import StatsRequest, delete_marker, list_markers, save_marker
+from internal.ui.exports import csv_bytes
+from internal.analytics.usage_statistics import StatsRequest, delete_marker, list_markers, save_marker
 
 
 def marker_controls(writer):

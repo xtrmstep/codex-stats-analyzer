@@ -8,8 +8,8 @@ from pathlib import Path
 import tempfile
 from typing import Any
 
-from runs import validate_run
-from experiment_store import validate_experiment
+from internal.metadata.runs import validate_run
+from internal.metadata.experiment_store import validate_experiment
 
 SCHEMA_VERSION = 1
 

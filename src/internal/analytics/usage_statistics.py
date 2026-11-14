@@ -6,9 +6,9 @@ import sqlite3
 from uuid import uuid4
 
 import pandas as pd
-from collection import CodexLogReader
-from parser import parse_collected
-from transformations import _project
+from internal.ingestion.collection import CodexLogReader
+from internal.ingestion.parser import parse_collected
+from internal.ingestion.transformations import _project
 
 
 TOKEN_FIELDS = ("total_tokens", "input_tokens", "output_tokens", "cached_input_tokens",

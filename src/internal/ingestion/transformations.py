@@ -8,8 +8,8 @@ import json
 import ntpath
 import re
 
-from analytics import calculate_increments, calculate_response_usage
-from parser import parse_collected
+from internal.analytics.token_accounting import calculate_increments, calculate_response_usage
+from internal.ingestion.parser import parse_collected
 
 
 @dataclass(frozen=True)

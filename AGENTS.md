@@ -130,8 +130,8 @@ flowchart TD
 
 ## 1. Repo structure
 
-- `app.py` is the application entry point. `dashboard.py` contains the Streamlit dashboard, and `run.bat` starts the app on Windows. See `README.md` for setup and usage.
-- Root-level Python modules handle session parsing, analytics, annotations, experiments, and exports.
+- `src/app.py` is the application entry point. `src/internal/ui/dashboard.py` contains the Streamlit dashboard, and `run.bat` starts the app on Windows. See `README.md` for setup and usage.
+- `src/internal/` contains ingestion, analytics, metadata, and UI packages, plus shared repository paths.
 - `config.toml` defines session sources. `data/` holds local annotations and experiment history. `requirements.txt` lists Python dependencies.
 - `specification/` contains the authoritative product specification.
 - `tasks/` holds numbered task files. `tasks/done/` and `tasks/incomplete/` hold task history. Use `tasks/temp/` for optional uncommitted task artifacts.

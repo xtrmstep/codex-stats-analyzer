@@ -3,8 +3,8 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from analytics import Increment, Total, aggregate
-from parser import Event
+from internal.analytics.token_accounting import Increment, Total, aggregate
+from internal.ingestion.parser import Event
 
 
 @dataclass(frozen=True)

@@ -6,10 +6,10 @@ import statistics
 import pandas as pd
 import streamlit as st
 
-from annotations import StorageError
-from labels import assign_labels, assigned, matches, run_labels
-from metrics import summarize
-from runs import calculate_run, delete_run, upsert_run
+from internal.metadata.annotations import StorageError
+from internal.metadata.labels import assign_labels, assigned, matches, run_labels
+from internal.analytics.metrics import summarize
+from internal.metadata.runs import calculate_run, delete_run, upsert_run
 
 
 def select_runs(data, events, increments, selection, base):

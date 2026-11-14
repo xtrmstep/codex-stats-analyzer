@@ -5,8 +5,8 @@ from datetime import datetime
 import math
 from uuid import uuid4
 
-from analytics import Increment, Total, aggregate
-from parser import Event
+from internal.analytics.token_accounting import Increment, Total, aggregate
+from internal.ingestion.parser import Event
 
 
 def _time(value):
@@ -95,7 +95,7 @@ def calculate_run(run: dict, events: list[Event], increments: list[Increment]) -
     scope_notes = []
     threads = {event.thread_id for event in source_events if event.thread_id}
     if threads:
-        from agents import analyze_agents
+        from internal.analytics.agents import analyze_agents
 
         hierarchy = analyze_agents(next(iter(threads)), source_events, [])
         roots = {thread for thread in threads

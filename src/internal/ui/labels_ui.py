@@ -4,8 +4,8 @@ from copy import deepcopy
 
 import streamlit as st
 
-from annotations import StorageError
-from labels import assign_labels, delete_label, run_labels, upsert_label
+from internal.metadata.annotations import StorageError
+from internal.metadata.labels import assign_labels, delete_label, run_labels, upsert_label
 
 
 def manage(store, snapshot, session_ids):

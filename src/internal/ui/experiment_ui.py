@@ -3,16 +3,16 @@
 from copy import deepcopy
 from dataclasses import asdict
 from datetime import date
-from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from annotations import MetadataStore, StorageError
-from experiment_store import FILTER_FIELDS, METRICS, groups_from_definition, record_snapshot, upsert_experiment
-from experiments import compare_groups
-from exports import csv_bytes, COMPARISON_COLUMNS
+from internal.metadata.annotations import MetadataStore, StorageError
+from internal.metadata.experiment_store import FILTER_FIELDS, METRICS, groups_from_definition, record_snapshot, upsert_experiment
+from internal.metadata.experiments import compare_groups
+from internal.ui.exports import csv_bytes, COMPARISON_COLUMNS
+from internal.paths import DATA_DIR
 
 
 def _serialize_filters(selection, agent, runs):
@@ -29,7 +29,7 @@ def _serialize_filters(selection, agent, runs):
 
 def render_experiments(data, events, increments, frame, selection, selected_agent, chosen_runs):
     """Edit, recalculate and explicitly snapshot saved comparisons."""
-    store = MetadataStore(Path(__file__).resolve().parent / "data" / "experiments.json", "experiments")
+    store = MetadataStore(DATA_DIR / "experiments.json", "experiments")
     try:
         snapshot = store.load()
     except StorageError as exc:

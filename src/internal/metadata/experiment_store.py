@@ -4,8 +4,8 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from experiments import Group
-from metrics import Filters
+from internal.metadata.experiments import Group
+from internal.analytics.metrics import Filters
 
 METRICS = ("mean_tokens", "median_tokens", "output_tokens", "cache_percentage", "subagent_share", "elapsed_seconds", "success_rate", "evaluation_score")
 FILTER_FIELDS = ("label_ids", "task_types", "execution_modes", "projects", "models", "sessions", "agent_roles")

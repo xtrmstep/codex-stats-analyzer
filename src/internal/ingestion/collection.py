@@ -9,7 +9,8 @@ import re
 import sqlite3
 from uuid import uuid4
 
-from parser import Diagnostic, discover_files, read_source_lines
+from internal.ingestion.parser import Diagnostic, discover_files, read_source_lines
+from internal.paths import DATA_DIR
 
 
 @dataclass(frozen=True)
@@ -42,7 +43,7 @@ def _identifier(value: str) -> str:
 class DatabaseWriter:
     """Write mapped rows to SQLite under caller-controlled transactions."""
 
-    def __init__(self, database_path: Path = Path(__file__).resolve().parent / "data" / "codex_usage.sqlite3"):
+    def __init__(self, database_path: Path = DATA_DIR / "codex_usage.sqlite3"):
         self.database_path = Path(database_path)
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
         self.connection = sqlite3.connect(self.database_path)
@@ -243,7 +244,7 @@ class CodexLogImporter:
         self.reader = reader
         self.writer = writer
         if transformations is None:
-            from transformations import AgentThreadTransformation, UsageTransformation
+            from internal.ingestion.transformations import AgentThreadTransformation, UsageTransformation
             transformations = (AgentThreadTransformation(), UsageTransformation())
         self.transformations = tuple(transformations)
         if not self.transformations:

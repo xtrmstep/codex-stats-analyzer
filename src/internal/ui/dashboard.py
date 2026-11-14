@@ -1,6 +1,5 @@
 """Streamlit dashboard using the shared analytics contract."""
 
-from pathlib import Path
 from dataclasses import replace
 import sqlite3
 
@@ -8,19 +7,20 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from agents import analyze_agents
-from analytics import Total, calculate_increments
-from metrics import Filters, build_dataset, filter_dataset
-from collection import CodexLogImporter, CodexLogReader, DatabaseWriter
-from statistics_ui import display_timezone, marker_controls, render_statistics
-from usage_statistics import StatsCalculation
-from annotations import MetadataStore, StorageError, missing_sessions
-from labels_ui import manage
-from labels import assigned, matches, run_labels
-from run_ui import manage_runs, select_runs, run_summary
-from experiment_ui import render_experiments
-from exports import csv_bytes, SESSION_COLUMNS, RUN_COLUMNS
-from runs import calculate_run
+from internal.analytics.agents import analyze_agents
+from internal.analytics.token_accounting import Total, calculate_increments
+from internal.analytics.metrics import Filters, build_dataset, filter_dataset
+from internal.ingestion.collection import CodexLogImporter, CodexLogReader, DatabaseWriter
+from internal.ui.statistics_ui import display_timezone, marker_controls, render_statistics
+from internal.analytics.usage_statistics import StatsCalculation
+from internal.metadata.annotations import MetadataStore, StorageError, missing_sessions
+from internal.ui.labels_ui import manage
+from internal.metadata.labels import assigned, matches, run_labels
+from internal.ui.run_ui import manage_runs, select_runs, run_summary
+from internal.ui.experiment_ui import render_experiments
+from internal.ui.exports import csv_bytes, SESSION_COLUMNS, RUN_COLUMNS
+from internal.metadata.runs import calculate_run
+from internal.paths import DATA_DIR
 
 
 def _display(total, suffix=""):
@@ -79,7 +79,7 @@ def _render(sources, writer):
     parsed = report_calculator.parsed
     accounting = calculate_increments(parsed.events)
     frame = build_dataset(parsed.events, accounting.increments)
-    store = MetadataStore(Path(__file__).resolve().parent / "data" / "annotations.json", "annotations")
+    store = MetadataStore(DATA_DIR / "annotations.json", "annotations")
     try:
         snapshot = store.load()
     except StorageError as exc:

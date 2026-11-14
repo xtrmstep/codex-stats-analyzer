@@ -3,9 +3,9 @@
 from dataclasses import dataclass, replace
 from statistics import mean, median
 
-from labels import matches, run_labels
-from metrics import Filters, filter_dataset, summarize
-from runs import calculate_run
+from internal.metadata.labels import matches, run_labels
+from internal.analytics.metrics import Filters, filter_dataset, summarize
+from internal.metadata.runs import calculate_run
 
 
 @dataclass(frozen=True)

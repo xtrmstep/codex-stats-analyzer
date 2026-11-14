@@ -6,7 +6,8 @@ import re
 import sys
 import tomllib
 
-PROJECT_DIR = Path(__file__).resolve().parent
+from internal.paths import PROJECT_DIR
+
 CONFIG_PATH = PROJECT_DIR / "config.toml"
 
 
@@ -68,7 +69,7 @@ def main() -> None:
     except ValueError as exc:
         st.error(f"Configuration error: {exc} Edit config.toml and restart the application.")
         return
-    from dashboard import render
+    from internal.ui.dashboard import render
 
     render(sources)
 
