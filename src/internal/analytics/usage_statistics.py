@@ -36,7 +36,6 @@ class StatsRequest:
     start_date: date | None = None
     end_date: date | None = None
     bucket: str = "daily"
-    agent_grouping: str = "thread"
     marker: TimeMarker | None = None
     projects: frozenset[str] | None = None
     models: frozenset[str] | None = None
@@ -133,12 +132,8 @@ def _diagnostic_matches(item, request):
     return stamp is None or _date_matches(stamp, request)
 
 
-def _agent(row, grouping):
-    if grouping == "thread":
-        return row["thread_id"]
-    if grouping == "name":
-        return row["agent_name"] or row["role"]
-    raise ValueError("Agent grouping must be thread or name.")
+def _agent(row):
+    return row["agent_name"] or row["role"]
 
 
 def _bucket(value, request):
@@ -249,14 +244,14 @@ class AgentUsageOverTimeCalculator(UsageCalculator):
     """Group usage by agent and time."""
 
     def key(self, row, request):
-        return None, _agent(row, request.agent_grouping), _bucket(row["observed"], request)
+        return None, _agent(row), _bucket(row["observed"], request)
 
 
 class AgentUsageByProjectCalculator(UsageCalculator):
     """Group usage by agent and project."""
 
     def key(self, row, request):
-        return row["project_key"], _agent(row, request.agent_grouping), None
+        return row["project_key"], _agent(row), None
 
 
 class ModelUsageCalculator(UsageCalculator):

@@ -53,7 +53,6 @@ classDiagram
         filters
         selected_bounds
         time_bucket_size
-        agent_grouping
     }
     class UsageMeasurement {
         scope, effective_bounds

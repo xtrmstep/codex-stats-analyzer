@@ -66,7 +66,7 @@ def _row(measurement, view=None):
         "Start": measurement.start.isoformat() if measurement.start is not None else None,
         "End": measurement.end.isoformat() if measurement.end is not None else None,
         "Project": measurement.project,
-        "Agent": measurement.agent if view not in {"Model", "Session"} else None,
+        "Agent": (measurement.agent or "Unknown") if view in {"Agent over time", "Agent by project"} else None,
         "Model": measurement.agent if view == "Model" else None,
         "Session": measurement.agent if view == "Session" else None,
         "Time": measurement.bucket.isoformat() if measurement.bucket is not None else None,
@@ -88,10 +88,10 @@ def _row(measurement, view=None):
 
 
 def render_statistics(writer, calculator, selection, marker, project_keys, selected_agent,
-                      bucket, grouping, view, sort_by, sort_order, record_ids=None):
+                      bucket, view, sort_by, sort_order, record_ids=None):
     """Calculate and render both scopes and a selected breakdown."""
     request = StatsRequest(start_date=selection.start_date, end_date=selection.end_date,
-                           bucket=bucket, agent_grouping=grouping,
+                           bucket=bucket,
                            marker=marker, projects=project_keys, models=selection.models,
                            sessions=selection.sessions, roles=selection.agent_roles,
                            agents=frozenset({selected_agent}) if selected_agent != "All agents" else None,

@@ -55,7 +55,7 @@ Show total, input, and output tokens, input and output distribution, cache perce
 
 #### 3.2.2.2 Trends and charts
 
-Show token trends by hour, day, week, or month. Include project and agent trends, agent usage by project, breakdowns by model and session, cached versus non-cached input, main-agent versus subagent usage, and a session details table. Agent views can show individual threads or group by observed name or role. Use nicknames to identify individual executions where available. Support filtering, grouping, sorting, and CSV export.
+Show token trends by hour, day, week, or month. Include project and agent trends, agent usage by project, breakdowns by model and session, cached versus non-cached input, main-agent versus subagent usage, and a session details table. Agent trends and agent usage by project group threads by recorded agent name, falling back to role; show Unknown when neither is available. The agent filter selects individual threads. Use nicknames to identify individual executions where available. Support filtering, grouping, sorting, and CSV export.
 
 #### Agent hierarchy and timeline
 
