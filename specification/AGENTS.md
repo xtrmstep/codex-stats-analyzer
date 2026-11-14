@@ -11,8 +11,6 @@ Specifications define what the system must do and how components must interact. 
 ```
 specification/
 ├── AGENTS.md                          — this file; single entry point
-├── codex-usage-analyzer.md            — comprehensive product specification
-│
 ├── 01-screens/
 │   ├── AGENTS.md                      — conventions for screen specifications
 │   ├── 000-main-layout.md             — application shell and regions
@@ -27,7 +25,7 @@ specification/
 │   │   ├── 030-code-style.md
 │   │   ├── 040-verification.md
 │   │   └── 050-diagram-guidelines.md
-│   └── 02-design/                     — reserved for future architecture design documents
+│   └── 02-design/                     — system overview, data model, and backend design
 │
 └── 03-contracts/
     └── AGENTS.md                      — conventions for contract specifications
@@ -35,7 +33,7 @@ specification/
 
 ## Navigation
 
-- **Product requirements:** start with [codex-usage-analyzer.md](./codex-usage-analyzer.md).
+- **System scope and data sources:** start with the [system overview](./02-architecture/02-design/000-system-overview.md).
 - **UI behavior:** read [01-screens/AGENTS.md](./01-screens/AGENTS.md), then the relevant screen documents in [01-screens/](./01-screens/).
 - **Engineering conventions:** read the applicable guideline in [02-architecture/01-guidelines/](./02-architecture/01-guidelines/).
 - **Interface contracts:** read [03-contracts/AGENTS.md](./03-contracts/AGENTS.md).

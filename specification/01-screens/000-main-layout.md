@@ -12,9 +12,9 @@ The application is organized into three primary regions:
 
 ```text
 +----------------------------------------------------------------------------------+
-| [0.2] Header / page context / global filter controls                              |
-|   - page title and current context                                                |
-|   - global filters (date, project, model, session, agent role, execution mode)    |
+| [0.2] Header                                                                       |
+|   - system title                                                                   |
+|   - date range                                                                     |
 +-------------------------+----------------------------------------------------------+
 | [0.1] Navigation        | [0.3] Main content                                       |
 |   - Overview             |   - overview KPIs and charts                              |
@@ -36,7 +36,7 @@ The navigation region is the persistent side area for the two supported views: o
 
 ### 0.2.2 Header region
 
-The header region contains the active page context and the supported global filters. It is described in [020-header.md](./020-header.md). No additional header controls are assumed unless they are explicitly added later.
+The header shows the system title and date range selector. See [020-header.md](./020-header.md).
 
 ### 0.2.3 Main content region
 

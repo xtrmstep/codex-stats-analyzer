@@ -36,4 +36,21 @@ classDiagram
     UsageCalculator <|.. AgentUsageByProjectCalculator
 ```
 
-Use shared rules for token totals, overlap, coverage, weighted cache percentage, and daily averages. Dashboard and export use the same measurements. Calculate window summaries directly from eligible rows. Clip time buckets to the reporting window. Mark empty windows explicitly and keep unknown amounts distinct from zero. Coverage can be complete, partial, or unknown. See [reporting windows](../../codex-usage-analyzer.md#63-visualizations).
+Dashboard and export use the same measurements. Calculate window summaries directly from eligible rows and clip time buckets to the reporting window. See [reporting windows](../../01-screens/030-content.md#reporting-windows).
+
+## Agent analysis
+
+Build the two-level view from verified relationships between the main agent and its subagents. Keep unlinked agents separate when relationships are unknown. Agent roles and nicknames are optional metadata.
+
+| Scope | Metrics |
+| --- | --- |
+| Agent | Model, observed role and verified parent when available, token consumption, cache percentage, first and last recorded activity, and available execution status. |
+| Session | Participating agent count, main-agent usage, and combined subagent usage and share where independent usage can be established. |
+
+### Token accounting
+
+- **Ownership.** Prefer the explicit owner. Use the source thread for unambiguous legacy records and the verified original owner for copied or inherited history. Coordination events may target another thread. Exclude ambiguous ownership from verified agent totals.
+- **Counters.** Use per-response usage where supported and deduplicate by thread and response IDs when both are known. Treat turn and thread counters as summaries of the same usage. Calculate legacy deltas from one cumulative stream per owner, using the previous observation even outside the reporting window. Keep its timestamp when known. Combine response usage and legacy deltas only for disjoint scopes.
+- **Attribution.** Match model and project context by thread and turn IDs when available. Retain the source working directory. Prefer the turn's directory over the thread's directory for project attribution, and group by normalized repository identity when available or normalized directory otherwise. Group threads by session where supported. Keep unknown attribution visible where usage can be counted safely.
+- **Amounts and coverage.** Track total, input, cached input, non-cached input, and output tokens, plus cache-write input and reasoning output when available. Calculate non-cached input as input minus cached input when both are known. Use provenance to count independently attributable usage once, including in main-agent and subagent rollups. For gaps, resets, conflicts, or potential overlap, report the reliable independent amount as partial or the amount as unknown. Keep unknown counts distinct from zero.
+- **Rates.** Divide eligible summed cached input by eligible summed input for cache percentage. Divide the token total by elapsed days for average daily usage, including days with no recorded usage when coverage is complete. Carry the total's coverage into the daily average and leave it unknown if duration or total is unavailable.

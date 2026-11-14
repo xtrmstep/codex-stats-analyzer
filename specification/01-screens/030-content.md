@@ -43,7 +43,7 @@ These parameters determine the data slice being analyzed and should affect all m
 
 Manual annotations are treated as regular filtering parameters rather than a separate feature area. They extend the available filtering options for the current view.
 
-The saved time marker selector enables the second metric scope defined in [Visualizations](../codex-usage-analyzer.md#63-visualizations). The existing filter selection applies to both scopes.
+The overview supports filters for date, project, model, session, observed agent role, and execution mode. The date range is in the [header](./020-header.md#22-header-elements). Use the view configuration for other filters.
 
 ### 3.2.2 Metrics
 
@@ -51,36 +51,42 @@ The second block displays summary metrics and trend visualizations.
 
 #### 3.2.2.1 Overview KPIs
 
-This section summarizes key indicators, including:
-
-- total input tokens
-- total output tokens
-- processing speed
-- additional relevant summary metrics
-
-With a time marker selected, present **Full selected period** and **Since [marker name]** together. Identify the marker timestamp and the effective range so the user can interpret the two sets of values.
+Show total, input, and output tokens, input and output distribution, cache percentage, session and agent counts, processing speed, average daily tokens, and subagent token share where independently attributable. Distinguish observed facts, manual annotations, and estimates.
 
 #### 3.2.2.2 Trends and charts
 
-This section shows how metrics change over time, such as:
+Show token trends by hour, day, week, or month. Include project and agent trends, agent usage by project, breakdowns by model and session, cached versus non-cached input, main-agent versus subagent usage, and a session details table. Agent views can show individual threads or group by observed name or role. Use nicknames to identify individual executions where available. Support filtering, grouping, sorting, and CSV export.
 
-- hourly and daily trends
-- grouped breakdowns based on the selected view parameters
-- chart output reflecting the chosen dimensions, grouping, and filters
+#### Agent hierarchy and timeline
+
+Show the main agent and its subagents for the selected session. List unlinked agents separately. Show the [agent and session metrics](../02-architecture/02-design/020-backend-class-design.md#agent-analysis) and a Gantt-style timeline highlighting overlap when supported by timestamps. Distinguish observed activity intervals from verified execution durations. Selecting an agent filters the usage charts.
+
+#### Saved time markers
+
+Users can create, rename, edit, and delete named timestamps. Markers are available across usage views and persist across restarts and rebuilds.
+
+#### Reporting windows
+
+Show **Full selected period** and, when a marker is selected, **Since [marker name]** together. The latter is the intersection of the selected range and the time starting at the marker, inclusive. Apply the same filters to both. Show the marker timestamp and effective bounds, and display **No time in range** for an empty intersection. Place legacy deltas by observation time and flag uncertain attribution if a delta spans the cutoff. Use the [token accounting rules](../02-architecture/02-design/020-backend-class-design.md#token-accounting) for coverage and rates.
+
+#### Session comparisons
+
+Compare two or more groups of sessions using available filters and observed execution characteristics, such as model, skill usage, or execution mode. Show each group's session count, average and median tokens per session, output tokens, cache percentage, independently attributable subagent share, and elapsed duration where verified.
+
+Show results in a comparison table with aggregate bar charts and token-distribution box plots. Show absolute and percentage differences for token and duration metrics when calculable. Flag differences in model or other known conditions that affect comparability. Present the differences as observations and avoid causal claims.
 
 ## 3.3 Content behavior
 
 ### 3.3.1 Parameter-driven updates
 
-All metrics and charts update according to the selected view configuration. The current filtering choices, grouping, sorting, and manual-annotation filters should refresh the displayed KPI values and trend breakdowns.
+All metrics and charts update according to the selected view configuration. The current filtering choices, grouping, sorting, and manual-annotation filters should refresh the displayed KPI values and trend breakdowns. Users can refresh the source data. If a refresh fails, show a diagnostic and keep displaying the last committed results.
 
 ### 3.3.2 Scope boundaries
 
 This document intentionally does not define:
 
 - exact field layout within the configuration block
-- exact chart types beyond the trend and breakdown requirement
-- individual metric formulas beyond summary examples
+- exact chart types where unspecified
 - a separate manual-annotations management surface
 
 The spec remains minimal until a later UI pass adds page-specific details.

@@ -1,6 +1,13 @@
 # System overview
 
-The Codex Usage Analyzer reads local Codex logs and reports token usage by project, model, and agent in a dashboard. It keeps a local copy of the logs so usage can be rebuilt after the source files move or disappear.
+The Codex Usage Analyzer is a local Windows application for understanding token usage, agent activity, and the efficiency of different execution configurations. Users can analyze usage by session, project, model, or agent, assess delegation overhead, and compare groups of sessions. The application works offline without Codex authentication, API access, or external services. It keeps a local copy of the logs so usage can be rebuilt after the source files move or disappear.
+
+## Core concepts
+
+- A **session** is a Codex conversation identified by its session ID. It can contain several user requests, execution phases, and agent threads.
+- An **agent thread** identifies one execution. The **main agent** may act as an orchestrator. **Subagents** are agents started by the main agent. See [agent analysis](./020-backend-class-design.md#agent-analysis) and the [thread data model](./010-usage-data-model.md#codexagentthread).
+
+## System components
 
 ```mermaid
 flowchart LR
@@ -13,16 +20,22 @@ flowchart LR
 
 Collection and reporting run in the same application process and share one local database.
 
+## Data sources
+
+Read JSONL files from `%USERPROFILE%\.codex\sessions`, `%USERPROFILE%\.codex\archived_sessions`, and additional configured directories. Extract session identity, project path, timestamps, model and reasoning effort, agent identity and available parent, role and nickname, token counters, coordination events, and recorded skill invocations. Use event evidence to identify skill or subagent activity. Conversation text alone is insufficient.
+
 ## Component behavior
 
 | Area | Behavior |
 | --- | --- |
 | <a name="raw-collection"></a>Log collection | On first use and refresh, scan configured active and archived logs read-only. Store every line byte for byte, including malformed, unknown, and unterminated lines. Raw records can contain prompts, instructions, or tool output. |
 | Log continuity | Identify lines by log identity and line number. Reuse records for unchanged logs and verified archive moves. Check the stored byte prefix before appending or completing a line and keep its ID and captured bytes. Assign a new identity to rewrites or truncations that fail this check. Retain previously collected records even if files disappear. |
-| <a name="usage-rebuild-and-accounting"></a>Usage rebuild | After collection or on rebuild, run the same transformations over one committed, source-ordered snapshot. Report malformed, incomplete, or unsupported data and carry known affected times and threads into coverage. The same records and rules produce the same results. |
-| Token accounting | Resolve ownership first. Prefer explicit owners, use the source thread for unambiguous legacy records, and attribute verified copied or inherited history to its original owner. Coordination records may target another thread. Use per-response usage where supported and deduplicate by thread and response IDs when both are known. Turn and thread counters summarize the same usage. Calculate legacy deltas from one cumulative stream per owner. Use the prior observation even outside the report window and keep its timestamp when known. Combine legacy and response usage only for disjoint scopes. |
-| Attribution | Match model and project context by thread and turn IDs when available. Keep the source working directory, attribute project by turn directory with thread directory as fallback, and group by normalized repository identity or directory. Show missing attribution as unknown. Group threads by session where supported and executions across chats by agent name or role. Use nicknames to identify individual executions. |
-| SQLite storage | Commit each source's raw changes in one transaction. Publish derived usage, threads, and coverage diagnostics in a separate transaction. Report missing directories and continue with available data. If reading, transformation, or writing fails, report it and retain the last committed usage and committed raw records for retry. Preserve raw records, saved markers, and annotations across rebuilds and schema upgrades. |
-| Statistics and dashboard | Recalculate from committed derived data when filters change. Use provenance to count verified usage once and exclude ambiguous ownership from verified agent totals. For gaps, resets, conflicts, or potential overlap, report the reliable independent amount as partial or the total as unknown. Keep unavailable token counts unknown. |
+| Usage rebuild | After collection or on rebuild, run the same transformations over one committed, source-ordered snapshot. Report malformed, incomplete, or unsupported data and carry known affected times and threads into coverage. The same records and rules produce the same results. |
+| Local storage | Commit each source's raw changes in one transaction. Publish derived usage, threads, and coverage diagnostics in a separate transaction. Report missing directories and continue with available data. If reading, transformation, or writing fails, report it and retain the last committed usage and raw records for retry. Preserve raw records, saved markers, and user-authored data across rebuilds and schema upgrades. Keep stable session and event references and save annotation files atomically. |
+| Statistics and dashboard | Recalculate from committed derived data when filters change. Apply the [token accounting rules](./020-backend-class-design.md#token-accounting) before filtering or grouping usage. |
 
-[Usage data model](./010-usage-data-model.md) · [Backend class design](./020-backend-class-design.md)
+## Local deployment
+
+Use Python with pandas for analysis, Streamlit and Plotly for the dashboard, and SQLite for collected and derived data. Keep the application self-contained, with local JSON for existing user metadata. Bind the dashboard to `http://localhost:8501` and disable telemetry. Provide `setup.bat` for installation and `run.bat` to start the application.
+
+[Usage data model](./010-usage-data-model.md) · [Backend class design](./020-backend-class-design.md) · [Dashboard behavior](../../01-screens/030-content.md)
