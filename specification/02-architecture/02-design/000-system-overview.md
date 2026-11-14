@@ -1,6 +1,6 @@
 # System overview
 
-The Codex Usage Analyzer reads local Codex logs and reports token usage by project, model, and agent in a dashboard and CSV exports. It keeps a local copy of the logs so usage can be rebuilt after the source files move or disappear.
+The Codex Usage Analyzer reads local Codex logs and reports token usage by project, model, and agent in a dashboard. It keeps a local copy of the logs so usage can be rebuilt after the source files move or disappear.
 
 ```mermaid
 flowchart LR
@@ -9,7 +9,6 @@ flowchart LR
     DB -->|Original records for rebuild| Import
     DB -->|Committed usage| Stats[Statistics calculation]
     Stats --> Dashboard[Usage dashboard]
-    Stats --> Export[CSV export]
 ```
 
 Collection runs on first use and source refresh. Dashboard filters recalculate statistics from the committed data. Collection and reporting run in the same application process and use the same local database.
