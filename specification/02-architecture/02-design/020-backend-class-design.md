@@ -30,8 +30,8 @@ Parsing is independent of SQLite and the dashboard. Parsers may consult multiple
 | <a name="statscalculation"></a>`StatsCalculation` | Resolves windows once per [request](./010-usage-data-model.md#statsrequest), shares filters and one committed read snapshot, and assembles results. |
 | <a name="usagecalculator"></a>`UsageCalculator` | Reads committed rows through the report connection and returns [measurements](./010-usage-data-model.md#usagemeasurement) using shared aggregation. |
 | `ProjectUsageOverTimeCalculator` | Reads `CodexUsage` and groups by project and time bucket. |
-| `AgentUsageOverTimeCalculator` | Reads `CodexUsage` and `CodexAgentThread` and groups by recorded agent name (falling back to role, then Unknown) and time bucket. |
-| `AgentUsageByProjectCalculator` | Reads `CodexUsage` and `CodexAgentThread` and groups by recorded agent name (falling back to role, then Unknown) and project. |
+| `AgentUsageOverTimeCalculator` | Reads `CodexUsage` and `CodexAgentThread` and groups by assigned agent name (falling back to recorded name, role, then Default) and time bucket. |
+| `AgentUsageByProjectCalculator` | Reads `CodexUsage` and `CodexAgentThread` and groups by assigned agent name (falling back to recorded name, role, then Default) and project. |
 
 ```mermaid
 classDiagram

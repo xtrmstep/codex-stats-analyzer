@@ -26,7 +26,7 @@ This section presents the aggregated statistics for the selected time range and 
 
 ### 1.2.2 Manual annotations
 
-This section allows users to create, edit, and delete named time markers. Markers have a timestamp and apply across chats.
+This section allows users to create, edit, and delete named time markers and to set or clear a user-assigned name for each agent execution. Markers have a timestamp and apply across chats. Identify executions using chat titles and available roles or nicknames; distinguish duplicate labels without displaying IDs.
 
 ## 1.3 Navigation behavior
 

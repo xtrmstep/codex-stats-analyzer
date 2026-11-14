@@ -59,7 +59,7 @@ def _row(measurement, view=None):
         "Start": measurement.start.isoformat() if measurement.start is not None else None,
         "End": measurement.end.isoformat() if measurement.end is not None else None,
         "Project": measurement.project,
-        "Agent": (measurement.agent or "Unknown") if view in {"Agent over time", "Agent by project"} else None,
+        "Agent": (measurement.agent or "Default") if view in {"Agent over time", "Agent by project"} else None,
         "Model": measurement.agent if view == "Model" else None,
         "Time": measurement.bucket.isoformat() if measurement.bucket is not None else None,
         "Total tokens": measurement.totals["total_tokens"],

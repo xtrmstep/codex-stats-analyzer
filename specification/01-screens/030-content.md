@@ -48,7 +48,7 @@ Show total, input, and output tokens, input and output distribution, cache perce
 
 #### 3.2.2.2 Trends and charts
 
-Show token trends by hour, day, week, or month. Include project and agent trends, agent usage by project, breakdowns by model, and cached versus non-cached input. Agent trends and agent usage by project group threads by recorded agent name, falling back to role; show Unknown when neither is available. The agent filter selects individual threads. Use nicknames to identify individual executions where available. Support filtering, grouping, sorting, and CSV export.
+Show token trends by hour, day, week, or month. Include project and agent trends, agent usage by project, breakdowns by model, and cached versus non-cached input. Agent trends and agent usage by project group executions by user-assigned name, then recorded name or role, then Default. The agent filter selects individual executions using readable chat and agent labels, with display-only disambiguation for duplicates. Use nicknames to identify individual executions where available. Support filtering, grouping, sorting, and CSV export.
 
 #### Saved time markers
 

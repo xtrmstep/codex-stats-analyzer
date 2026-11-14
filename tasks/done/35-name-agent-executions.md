@@ -16,3 +16,10 @@ Assign agent names for cross-chat reporting
 
 - Naming two executions **Reviewer** groups their usage together across chats within the same time bucket or project. Clearing an assignment restores the recorded name or role, or **Default** when both are absent. Refresh and rebuild preserve assignments.
 - Agent selection and editing show human-readable labels without session or thread IDs. Duplicate chat or agent names remain independently selectable. Renaming an agent execution changes its report group while leaving its role and accounting identity intact.
+
+## Issue Logs
+
+### Failed check 1
+- `src/internal/ui/agent_names_ui.py`: numbering duplicate labels can collide with another naturally occurring chat or agent label ending in the same suffix.
+- The task requires duplicate display labels to remain independently selectable without showing IDs.
+- Reserve natural labels and choose unused numeric suffixes for each duplicate, then verify collisions and ordinary duplicates.

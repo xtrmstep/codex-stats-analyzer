@@ -13,7 +13,7 @@ SQLite stores the first four classes. Requests and measurements live in memory f
 | <a name="statsrequest"></a>`StatsRequest` | Carries report filters, time range, and grouping settings. |
 | <a name="usagemeasurement"></a>`UsageMeasurement` | Summarizes usage and coverage for a reporting window or a group within it. |
 
-`CodexUsage` has nullable input, output, cached input, cache-write input, reasoning output, and total token counts.
+User-assigned agent names are stored separately from imported threads, keyed by stable execution ID, and persist across refresh and rebuild. `CodexUsage` has nullable input, output, cached input, cache-write input, reasoning output, and total token counts.
 
 ## Class schema
 

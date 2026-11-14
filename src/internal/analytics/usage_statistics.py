@@ -125,7 +125,7 @@ def _diagnostic_matches(item, request):
 
 
 def _agent(row):
-    return row["agent_name"] or row["role"]
+    return row.get("assigned_name") or row["agent_name"] or row["role"] or "Default"
 
 
 def _bucket(value, request):
@@ -272,11 +272,12 @@ class StatsCalculation:
             if not state or not state["initialized"]:
                 raise ValueError("No successful usage publication is available.")
             self.rows = [dict(row) for row in connection.execute(
-                "SELECT u.*, t.session_id, t.thread_id, t.agent_name, t.role, t.nickname, t.parent_execution_id "
-                "FROM usage_records u LEFT JOIN agent_threads t ON t.execution_id = u.execution_id"
+                "SELECT u.*, t.session_id, t.thread_id, t.agent_name, t.role, t.nickname, t.parent_execution_id, n.name AS assigned_name "
+                "FROM usage_records u LEFT JOIN agent_threads t ON t.execution_id = u.execution_id "
+                "LEFT JOIN agent_names n ON n.execution_id = t.execution_id"
             )]
             self.diagnostics = [dict(row) for row in connection.execute("SELECT * FROM coverage_diagnostics")]
-            self.threads = [dict(row) for row in connection.execute("SELECT * FROM agent_threads")]
+            self.threads = [dict(row) for row in connection.execute("SELECT t.*, n.name AS assigned_name FROM agent_threads t LEFT JOIN agent_names n ON n.execution_id = t.execution_id")]
             self.parents = {row["execution_id"]: row["parent_execution_id"] for row in self.threads}
             records = CodexLogReader().replay_publication(connection)
             connection.commit()
@@ -299,7 +300,7 @@ class StatsCalculation:
         for row in rows:
             if any(choices is not None and row[field] not in choices for field, choices in
                    (("project_key", request.projects), ("model", request.models),
-                    ("role", request.roles), ("thread_id", request.agents), ("source_record_id", request.record_ids))):
+                    ("role", request.roles), ("execution_id", request.agents), ("source_record_id", request.record_ids))):
                 continue
             row["observed"] = _timestamp(row["observed_at"])
             row["prior"] = _timestamp(row["prior_observed_at"])
@@ -317,7 +318,7 @@ class StatsCalculation:
             project, _ = _project(event.project_path, event.repository_url)
             if any(choices is not None and value not in choices for value, choices in
                    ((project, request.projects), (event.model, request.models),
-                    (thread["role"], request.roles), (event.thread_id, request.agents), (event.record_id, request.record_ids))):
+                    (thread["role"], request.roles), (thread["execution_id"], request.agents), (event.record_id, request.record_ids))):
                 continue
             try:
                 stamp = _timestamp(event.timestamp) if event.timestamp else None

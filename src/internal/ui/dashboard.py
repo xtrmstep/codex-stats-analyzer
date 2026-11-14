@@ -9,6 +9,7 @@ from internal.analytics.token_accounting import calculate_increments
 from internal.analytics.metrics import Filters, build_dataset, filter_dataset
 from internal.ingestion.collection import CodexLogImporter, CodexLogReader, DatabaseWriter
 from internal.ui.statistics_ui import marker_editor, marker_selector, render_statistics
+from internal.ui.agent_names_ui import agent_name_editor, execution_labels
 from internal.analytics.usage_statistics import StatsCalculation
 
 
@@ -44,6 +45,7 @@ def render(sources):
 def _render(sources, writer, page, start, end, range_ready):
     if page == "Manual annotations":
         marker_editor(writer)
+        agent_name_editor(writer)
         return
 
     filters = st.sidebar.container()
@@ -101,14 +103,20 @@ def _render(sources, writer, page, start, end, range_ready):
                             models=_options(frame, "model", "Models"),
                             agent_roles=_options(frame, "agent_role", "Agent roles"))
         selected = filter_dataset(frame, selection) if range_ready else frame.iloc[0:0].copy()
-        available_agents = sorted(selected["agent"].dropna().unique().tolist())
-        selected_agent = st.selectbox("Agent", ["All agents"] + available_agents)
+        available_pairs = set(zip(selected["session"], selected["agent"]))
+        available_threads = [row for row in report_calculator.threads
+                             if (row["session_id"], row["thread_id"]) in available_pairs]
+        labels = execution_labels(available_threads)
+        selected_agent = st.selectbox("Agent", ["All agents"] + sorted(labels, key=lambda key: labels[key].casefold()),
+                                      format_func=lambda key: labels.get(key, key))
 
     if not range_ready:
         st.info("Select both dates for the reporting range.")
         return
     if selected_agent != "All agents":
-        selected = selected.loc[selected["agent"] == selected_agent].copy()
+        chosen = next(row for row in available_threads if row["execution_id"] == selected_agent)
+        selected = selected.loc[(selected["session"] == chosen["session_id"]) &
+                                (selected["agent"] == chosen["thread_id"])].copy()
     render_statistics(
         writer, report_calculator, selection, marker, project_keys, selected_agent,
         bucket, view, sort_by, sort_order
