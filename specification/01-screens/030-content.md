@@ -7,6 +7,7 @@ This document defines the minimal content area for the two supported application
 ```text
 +--------------------------------------------------------------------------+
 | [3.1] View Parameters / View Configuration                                |
+|   - date range                                                            |
 |   - source refresh                                                        |
 |   - dimension selection                                                   |
 |   - grouping selection                                                    |
@@ -34,7 +35,20 @@ The first block is dedicated to defining how data is viewed. The user can config
 - `3.2.1.3` dimension selection
 - `3.2.1.4` grouping criteria, including time aggregation
 
-This block also contains **Refresh sources**. Overview results use the [header date range](./020-header.md#22-header-elements) and the [sidebar filters](./010-navigation.md#15-filters).
+This block also contains **Refresh sources**. Overview results use the date range and the [sidebar filters](./010-navigation.md#15-filters).
+
+#### Date range
+
+Show a **Date range** selector in Overview configuration. Resolve the selected preset against the app's local date each time Overview renders. Both date limits are inclusive.
+
+| Preset | Date limits |
+| --- | --- |
+| **Today** (default) | Today's date |
+| **All Time** | Unbounded |
+| **Current week** | This week's Monday through today |
+| **Last week** | Last week's Monday through Sunday |
+| **Current month** | This month's first day through today |
+| **Last month** | Last month's first through last day |
 
 ### 3.2.2 Metrics
 
@@ -64,7 +78,7 @@ Show **Full selected period** and, when a marker is selected, **Since [marker na
 
 ### 3.3.1 Parameter-driven updates
 
-Metrics and charts update according to the header date range, sidebar filters, and applicable view configuration. If source refresh fails, show a diagnostic and keep displaying the last committed results.
+Metrics and charts update according to the Overview date range, sidebar filters, and applicable view configuration. If source refresh fails, show a diagnostic and keep displaying the last committed results.
 
 ### 3.3.2 Scope boundaries
 

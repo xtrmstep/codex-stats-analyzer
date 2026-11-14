@@ -14,10 +14,9 @@ The application is organized into three primary regions:
 +----------------------------------------------------------------------------------+
 | [0.2] Header                                                                       |
 |   - system title                                                                   |
-|   - date range                                                                     |
 +-------------------------+----------------------------------------------------------+
 | [0.1] Sidebar            | [0.3] Main content                                       |
-|   - Navigation           |   - overview report controls, KPIs, and charts            |
+|   - Navigation           |   - overview date range, report controls, KPIs, and charts |
 |   - Filters (Overview)   |   - manual event editor                                   |
 +-------------------------+----------------------------------------------------------+
 ```
@@ -36,7 +35,7 @@ The left sidebar contains persistent **Navigation** and a **Filters** section fo
 
 ### 0.2.2 Header region
 
-The header shows the system title and date range selector. See [020-header.md](./020-header.md).
+The header shows the system title. See [020-header.md](./020-header.md).
 
 ### 0.2.3 Main content region
 
