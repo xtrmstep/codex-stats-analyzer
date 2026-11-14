@@ -9,7 +9,6 @@ import ntpath
 import re
 
 from analytics import calculate_increments, calculate_response_usage
-from agents import analyze_agents
 from parser import parse_collected
 
 
@@ -116,6 +115,8 @@ def _events(records):
 def _threads(events):
     data = {}
     parents = {}
+    diagnostics = []
+    calls = {}
     sessions_by_thread = {}
     for event in events:
         if event.thread_id:
@@ -132,29 +133,66 @@ def _threads(events):
             item["agent_name"] = event.agent_role
         if event.agent_nickname:
             item["nickname"] = event.agent_nickname
-        if event.parent_agent_id:
-            parents.setdefault(execution_id, set()).add(event.parent_agent_id)
+        if event.event_type == "session_meta" and event.parent_agent_id:
+            parents.setdefault(item["thread_id"], {}).setdefault(event.parent_agent_id, set()).add(event.record_id)
         evidence = event.evidence or {}
         if evidence.get("type") == "collab_agent_spawn":
             sender, receiver = evidence.get("sender_thread_id"), evidence.get("receiver_thread_id")
             if sender and receiver:
-                parents.setdefault(("thread", receiver), set()).add(sender)
+                parents.setdefault(receiver, {}).setdefault(sender, set()).add(event.record_id)
+        elif evidence.get("type") == "function_call" and evidence.get("name", "").replace("__", ".").split(".")[-1] == "spawn_agent":
+            calls[(item["thread_id"], evidence.get("call_id"))] = event.record_id
+        elif evidence.get("type") == "function_call_output":
+            call_id = evidence.get("call_id")
+            child = (evidence.get("output") or {}).get("agent_id")
+            call_record = calls.get((item["thread_id"], call_id))
+            if call_record and isinstance(child, str) and child:
+                parents.setdefault(child, {}).setdefault(item["thread_id"], set()).update((call_record, event.record_id))
     by_thread = {}
     for item in data.values():
         by_thread.setdefault(item["thread_id"], []).append(item["execution_id"])
-    if data:
-        root_thread = next(iter(data.values()))["thread_id"]
-        analysis = analyze_agents(root_thread, [event for event in events if event.thread_id], [])
-        for thread_id, agent in analysis.agents.items():
-            if agent.parent_id:
-                parents.setdefault(("thread", thread_id), set()).add(agent.parent_id)
-    for execution_id, item in data.items():
-        candidates = parents.get(execution_id, set()) | parents.get(("thread", item["thread_id"]), set())
-        if len(candidates) == 1:
-            matches = by_thread.get(next(iter(candidates)), [])
-            if len(matches) == 1 and matches[0] != execution_id:
-                item["parent_execution_id"] = matches[0]
-    return [CodexAgentThread(**item) for item in data.values()]
+    for child, candidates in parents.items():
+        child_matches = by_thread.get(child, [])
+        references = sorted({reference for refs in candidates.values() for reference in refs if reference})
+        message = None
+        if len(child_matches) != 1:
+            message = f"Unresolved child thread {child}."
+        elif len(candidates) != 1:
+            message = f"Conflicting parent claims for {child}: {', '.join(sorted(candidates))}."
+        else:
+            parent = next(iter(candidates))
+            parent_matches = by_thread.get(parent, [])
+            if parent == child:
+                message = f"Self-referential parent link for {child}."
+            elif len(parent_matches) != 1:
+                message = f"Unresolved parent {parent} for thread {child}."
+            else:
+                data[child_matches[0]]["parent_execution_id"] = parent_matches[0]
+        if message:
+            diagnostics.append({"source_record_id": references[0] if references else None,
+                                "execution_id": child_matches[0] if len(child_matches) == 1 else None,
+                                "observed_at": None, "message": f"{message} Evidence: {', '.join(references)}"})
+    visited = set()
+    for start in data:
+        path = []
+        positions = {}
+        node = start
+        while node is not None and node not in visited and node not in positions:
+            positions[node] = len(path)
+            path.append(node)
+            node = data[node]["parent_execution_id"]
+        if node in positions:
+            for member in path[positions[node]:]:
+                child = data[member]["thread_id"]
+                parent_id = data[member]["parent_execution_id"]
+                parent = data[parent_id]["thread_id"]
+                refs = sorted(parents.get(child, {}).get(parent, set()))
+                diagnostics.append({"source_record_id": refs[0] if refs else None, "execution_id": member,
+                                    "observed_at": None,
+                                    "message": f"Cyclic parent link {child} -> {parent} withheld. Evidence: {', '.join(refs)}"})
+                data[member]["parent_execution_id"] = None
+        visited.update(path)
+    return [CodexAgentThread(**item) for item in data.values()], diagnostics
 
 
 class AgentThreadTransformation(CodexRecordTransformation):
@@ -166,7 +204,7 @@ class AgentThreadTransformation(CodexRecordTransformation):
     def transform(self, records):
         """Return the threads observed in the supplied snapshot."""
         events, _ = _events(records)
-        return _threads(events), []
+        return _threads(events)
 
 
 def _project(directory, repository_url):
@@ -190,6 +228,7 @@ class UsageTransformation(CodexRecordTransformation):
         """Return attributable usage and diagnostics from one raw snapshot."""
         events, diagnostics = _events(records)
         contexts = {}
+        repositories = {}
         turn_contexts = {}
         event_context = {}
         for event in events:
@@ -197,15 +236,47 @@ class UsageTransformation(CodexRecordTransformation):
                 continue
             key = (event.session_id, event.thread_id)
             context = contexts.setdefault(key, {"model": None, "directory": None, "repository_url": None})
-            if event.model:
-                context["model"] = event.model
-            if event.project_path:
-                context["directory"] = event.project_path
-            if event.repository_url:
-                context["repository_url"] = event.repository_url
-            if event.turn_id and event.event_type == "turn_context":
-                turn_contexts[(key, event.turn_id)] = context.copy()
-            event_context[event.record_id] = turn_contexts.get((key, event.turn_id), context).copy()
+            if event.event_type == "session_meta":
+                if event.model:
+                    context["model"] = event.model
+                if event.project_path:
+                    context["directory"] = event.project_path
+            if event.project_path and event.repository_url:
+                directory_key = ntpath.normcase(ntpath.normpath(event.project_path))
+                repositories.setdefault((key, directory_key), set()).add(event.repository_url)
+        for event in events:
+            if not event.thread_id or event.event_type != "turn_context" or not event.turn_id:
+                continue
+            key = (event.session_id, event.thread_id)
+            context = contexts[key].copy()
+            context["model"] = event.model or context["model"]
+            context["directory"] = event.project_path or context["directory"]
+            turn_key = (key, event.turn_id)
+            if turn_key in turn_contexts:
+                previous = turn_contexts[turn_key]
+                for field in ("model", "directory"):
+                    if previous[field] != context[field]:
+                        context[field] = None
+                        diagnostics.append({"source_record_id": event.record_id,
+                                            "execution_id": _execution_id(*key), "observed_at": _utc(event.timestamp),
+                                            "message": f"Conflicting {field} for turn {event.turn_id}."})
+            turn_contexts[turn_key] = context
+        for event in events:
+            if not event.thread_id:
+                continue
+            key = (event.session_id, event.thread_id)
+            context = turn_contexts.get((key, event.turn_id), contexts[key]).copy()
+            directory = context["directory"]
+            if directory:
+                directory_key = ntpath.normcase(ntpath.normpath(directory))
+                candidates = repositories.get((key, directory_key), set())
+                if len(candidates) == 1:
+                    context["repository_url"] = next(iter(candidates))
+                elif len(candidates) > 1:
+                    diagnostics.append({"source_record_id": event.record_id, "execution_id": _execution_id(*key),
+                                        "observed_at": _utc(event.timestamp), "message": "Conflicting repository identities for working directory."})
+                    context["project_conflict"] = True
+            event_context[event.record_id] = context
 
         response_groups = {}
         partial_owners = set()
@@ -242,7 +313,8 @@ class UsageTransformation(CodexRecordTransformation):
                                     "observed_at": _utc(observations[0].timestamp), "message": "Conflicting response usage observations; usage withheld."})
                 continue
             event = observations[0]
-            values, complete = calculate_response_usage(event.token_counters["usage"])
+            values, counters_complete = calculate_response_usage(event.token_counters["usage"])
+            complete = counters_complete
             observation_contexts = [event_context.get(item.record_id, {}) for item in observations]
             models = {item.get("model") for item in observation_contexts}
             directories = {item.get("directory") for item in observation_contexts}
@@ -251,7 +323,7 @@ class UsageTransformation(CodexRecordTransformation):
                 complete = False
                 diagnostics.append({"source_record_id": event.record_id, "execution_id": execution_id,
                                     "observed_at": None, "message": "Response attribution or timestamp is incomplete or conflicting."})
-            if not complete:
+            if not counters_complete:
                 diagnostics.append({"source_record_id": event.record_id, "execution_id": execution_id,
                                     "observed_at": _utc(event.timestamp), "message": "Response counters are invalid or incomplete."})
             context = observation_contexts[0].copy()
@@ -260,7 +332,9 @@ class UsageTransformation(CodexRecordTransformation):
             if len(directories) > 1:
                 context["directory"] = None
                 context["repository_url"] = None
-            project_key, project_label = _project(context.get("directory"), context.get("repository_url"))
+            project_key, project_label = (None, None) if context.get("project_conflict") else _project(
+                context.get("directory"), context.get("repository_url")
+            )
             rows.append(CodexUsage(hashlib.sha256(json.dumps([thread, response]).encode()).hexdigest(),
                                    event.record_id, execution_id, next(iter(timestamps)) if len(timestamps) == 1 else None, None,
                                    context.get("directory"), project_key, project_label, context.get("model"),
@@ -325,7 +399,9 @@ class UsageTransformation(CodexRecordTransformation):
         for increment in accounting.increments:
             event = originals[increment.reference]
             context = event_context.get(event.record_id, {})
-            project_key, project_label = _project(context.get("directory"), context.get("repository_url"))
+            project_key, project_label = (None, None) if context.get("project_conflict") else _project(
+                context.get("directory"), context.get("repository_url")
+            )
             values = {name: increment.values.get(name) for name in CodexUsage.__dataclass_fields__
                       if name.endswith("_tokens")}
             rows.append(CodexUsage(event.record_id, event.record_id, increment.session_id, _utc(event.timestamp),

@@ -58,3 +58,7 @@ Produce agent thread and usage records from the retained logs so the reporting l
 ### Unresolved summary
 
 The derived dataset can contain cyclic hierarchy links and incorrect project attribution after a working-directory change. The likely causes are independent parent-link assembly and carrying repository context across directories without verifying its scope. Reconcile the final hierarchy with the existing cycle handling and associate repository identity with a verified directory before completing this task.
+
+### Resolution
+
+The final parent graph now withholds cyclic, conflicting, self-referential, and unresolved links with evidence-backed diagnostics. Project grouping uses repository identity only when retained evidence links it to the selected working directory. Focused checks cover cycles, conflicting parents, directory changes, replay, and publication rollback.

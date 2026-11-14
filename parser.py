@@ -297,6 +297,13 @@ def parse_collected(records) -> IngestionResult:
                             response_id=_string(payload.get("response_id")), record_id=record.record_id,
                             repository_url=_string(payload.get("git", {}).get("repository_url"))
                             if isinstance(payload.get("git"), dict) else None)
+            if raw["type"] == "session_meta":
+                source_meta = payload.get("source")
+                subagent = source_meta.get("subagent") if isinstance(source_meta, dict) else None
+                spawn = subagent.get("thread_spawn") if isinstance(subagent, dict) else None
+                parent = (_string(payload.get("parent_agent_id")) or _string(payload.get("parent_thread_id"))
+                          or (_string(spawn.get("parent_thread_id")) if isinstance(spawn, dict) else None))
+                event = replace(event, parent_agent_id=parent)
             if thread is None or thread != owner:
                 event = replace(event, parent_agent_id=None, agent_role=None, agent_nickname=None)
             result.events.append(event)
