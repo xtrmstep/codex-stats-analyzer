@@ -19,6 +19,19 @@ def _options(frame, column, label):
     return frozenset(selected) if selected else None
 
 
+def _unrestricted_label(label, options):
+    """Keep the default label distinct from actual names or titles."""
+    if label not in options:
+        return label
+    base = f"{label} (no filter)"
+    candidate = base
+    suffix = 2
+    while candidate in options:
+        candidate = f"{base} {suffix}"
+        suffix += 1
+    return candidate
+
+
 def render(sources):
     """Render the overview and selected session from local read-only sources."""
     page = st.sidebar.radio("Navigation", ["Overview", "Manual annotations"])
@@ -104,22 +117,26 @@ def _render(sources, writer, page, start, end, range_ready):
         available_pairs = set(zip(selected["session"], selected["agent"]))
         available_threads = [row for row in report_calculator.threads
                              if (row["session_id"], row["thread_id"]) in available_pairs]
+        titles = {row["chat_title"] for row in available_threads if row["chat_title"]}
+        all_chats_label = _unrestricted_label("All chats", titles)
+        if st.session_state.get("overview_chat") not in titles:
+            st.session_state["overview_chat"] = None
+        selected_chat = st.selectbox("Chat", [None] + sorted(titles, key=lambda title: (title.casefold(), title)),
+                                     format_func=lambda title: all_chats_label if title is None else title,
+                                     key="overview_chat")
+        if selected_chat is not None:
+            available_threads = [row for row in available_threads if row["chat_title"] == selected_chat]
         names = {reporting_agent_name(row) for row in available_threads}
-        all_agents_label = "All agents"
-        if all_agents_label in names:
-            all_agents_label = "All agents (no filter)"
-            suffix = 2
-            while all_agents_label in names:
-                all_agents_label = f"All agents (no filter) {suffix}"
-                suffix += 1
+        all_agents_label = _unrestricted_label("All agents", names)
         if st.session_state.get("overview_agent") not in names:
             st.session_state["overview_agent"] = None
         selected_agent = st.selectbox("Agent", [None] + sorted(names, key=lambda name: (name.casefold(), name)),
                                       format_func=lambda name: all_agents_label if name is None else name,
                                       key="overview_agent")
-        chosen_threads = [row for row in available_threads if reporting_agent_name(row) == selected_agent]
+        chosen_threads = [row for row in available_threads
+                          if selected_agent is None or reporting_agent_name(row) == selected_agent]
         selected_agents = (frozenset(row["execution_id"] for row in chosen_threads)
-                           if selected_agent is not None else None)
+                           if selected_chat is not None or selected_agent is not None else None)
 
     if not range_ready:
         st.info("Select both dates for the reporting range.")
