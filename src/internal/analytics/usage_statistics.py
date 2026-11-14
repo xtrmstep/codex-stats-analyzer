@@ -18,7 +18,7 @@ TOKEN_FIELDS = ("total_tokens", "input_tokens", "output_tokens", "cached_input_t
 
 @dataclass(frozen=True)
 class TimeMarker:
-    """A named UTC timestamp retained across imports and restarts."""
+    """A named offset-bearing timestamp retained across imports and restarts."""
 
     marker_id: str
     name: str
@@ -85,7 +85,7 @@ def save_marker(writer, name: str, timestamp: str, marker_id: str | None = None,
         raise ValueError("Marker timestamp must include a time zone.")
     if session_ids is not None and not session_ids:
         raise ValueError("Select at least one chat.")
-    marker = TimeMarker(marker_id or str(uuid4()), name, stamp.tz_convert("UTC").isoformat(), session_ids)
+    marker = TimeMarker(marker_id or str(uuid4()), name, timestamp, session_ids)
     if marker_id and not writer.connection.execute(
         "SELECT 1 FROM time_markers WHERE marker_id = ?", (marker_id,)
     ).fetchone():

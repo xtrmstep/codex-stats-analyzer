@@ -1,7 +1,7 @@
 """Saved experiment definitions and manual history snapshots."""
 
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime
 from uuid import uuid4
 
 from internal.metadata.experiments import Group
@@ -89,7 +89,7 @@ def record_snapshot(item, comparison, global_filters):
     """Append an explicit timestamped calculation with its global filter context."""
     if any(metric not in METRICS for metric in item["metrics"]):
         raise ValueError("Remove unsupported metrics before recording history.")
-    snapshot = {"recorded_at": datetime.now(timezone.utc).isoformat(), "global_filters": global_filters,
+    snapshot = {"recorded_at": datetime.now().astimezone().isoformat(), "global_filters": global_filters,
                 "groups": [{"name": group.name, "run_count": len(group.run_ids),
                             "measures": {key: {"value": group.measures[key].value, "eligible": group.measures[key].eligible}
                                          for key in item["metrics"]}}

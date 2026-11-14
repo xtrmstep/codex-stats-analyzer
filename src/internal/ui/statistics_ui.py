@@ -1,6 +1,6 @@
 """Streamlit controls and tables for committed usage measurements."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from dataclasses import replace
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -26,7 +26,7 @@ def marker_editor(writer):
     markers = list_markers(writer.connection)
     by_id = {marker.marker_id: marker for marker in markers}
     if "new_marker_default_timestamp" not in st.session_state:
-        st.session_state["new_marker_default_timestamp"] = datetime.now(timezone.utc).isoformat()
+        st.session_state["new_marker_default_timestamp"] = datetime.now().astimezone().isoformat()
     st.subheader("Saved time markers")
     choice = st.selectbox("Marker to edit", ["Create new marker"] + list(by_id),
                           format_func=lambda key: by_id[key].name if key in by_id else key)

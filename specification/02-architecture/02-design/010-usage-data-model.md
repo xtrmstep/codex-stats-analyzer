@@ -1,6 +1,6 @@
 # Usage data model
 
-SQLite stores the first four classes. Requests and measurements live in memory for each report. Store timestamps in UTC at source precision so any saved timestamp can serve as a cutoff. Use the dashboard time zone for date selection and display.
+SQLite stores the first four classes. Requests and measurements live in memory for each report. Store valid source timestamps exactly as recorded, including their offset and fractional precision. Store application-generated timestamps in machine-local time with an explicit offset so saved timestamps can serve as cutoffs. Use the dashboard time zone for date selection and display.
 
 ## Class overview
 

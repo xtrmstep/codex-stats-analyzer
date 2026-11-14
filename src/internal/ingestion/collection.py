@@ -2,7 +2,7 @@
 
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 import hashlib
 from pathlib import Path
 import re
@@ -313,7 +313,7 @@ class CodexLogImporter:
             if stored and stored[-1] != lines[len(stored) - 1]:
                 connection.execute("UPDATE collected_records SET original_line_bytes = ? WHERE log_identity = ? AND line_number = ?",
                                    (lines[len(stored) - 1], log_id, len(stored)))
-            timestamp = datetime.now(timezone.utc).isoformat()
+            timestamp = datetime.now().astimezone().isoformat()
             records = [CollectedCodexRecord(str(uuid4()), log_id, source_path, number, line, timestamp)
                        for number, line in enumerate(lines[len(stored):], len(stored) + 1)]
             columns = ("record_id", "log_identity", "source_path", "line_number", "original_line_bytes", "collected_at")

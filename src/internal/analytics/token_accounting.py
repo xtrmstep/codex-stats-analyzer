@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal
+import re
 from typing import Any
 
 from internal.ingestion.parser import Event
@@ -41,12 +43,16 @@ class AccountingResult:
     diagnostics: list[str] = field(default_factory=list)
 
 
-def _timestamp(value: str | None) -> datetime | None:
+def _timestamp(value: str | None) -> tuple[datetime, Decimal] | None:
     if not value:
         return None
     try:
-        result = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        return result if result.utcoffset() is not None else None
+        result = datetime.fromisoformat(value.replace("Z", "+00:00").replace("z", "+00:00"))
+        if result.utcoffset() is None:
+            return None
+        fraction = re.search(r"[.,](\d+)(?=[Zz]|[+-]\d\d(?::?\d\d)?$)", value)
+        precision = Decimal("0." + fraction.group(1)) if fraction else Decimal(result.microsecond) / 1000000
+        return result.replace(microsecond=0), precision
     except ValueError:
         return None
 

@@ -2,13 +2,13 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
+from datetime import datetime
 import hashlib
 import json
 import ntpath
 import re
 
-from internal.analytics.token_accounting import calculate_increments, calculate_response_usage
+from internal.analytics.token_accounting import _timestamp, calculate_increments, calculate_response_usage
 from internal.ingestion.parser import parse_collected
 
 
@@ -71,15 +71,15 @@ def _execution_id(session: str, thread: str) -> str:
     return hashlib.sha256(json.dumps([session, thread]).encode("utf-8")).hexdigest()
 
 
-def _utc(value: str | None) -> str | None:
+def _valid_timestamp(value: str | None) -> str | None:
     if not value:
         return None
     match = re.fullmatch(r"(\d{4}-\d\d-\d\d[Tt ]\d\d:\d\d:\d\d)(\.\d+)?([Zz]|[+-]\d\d:\d\d)", value)
     if not match:
         return None
     try:
-        base = datetime.fromisoformat(match.group(1) + match.group(3).upper().replace("Z", "+00:00"))
-        return base.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S") + (match.group(2) or "") + "Z"
+        datetime.fromisoformat(match.group(1) + match.group(3).upper().replace("Z", "+00:00"))
+        return value
     except ValueError:
         return None
 
@@ -107,7 +107,7 @@ def _events(records):
             owners = owners_by_log.get(record_logs[record_id], set())
             execution_id = next(iter(owners)) if len(owners) == 1 else None
         diagnostics.append({"source_record_id": record_id, "execution_id": execution_id,
-                            "observed_at": _utc(event.timestamp) if event else None,
+                            "observed_at": _valid_timestamp(event.timestamp) if event else None,
                             "message": f"{item.source}:{item.line or '-'}: {item.message}"})
     return parsed.events, diagnostics
 
@@ -258,7 +258,7 @@ class UsageTransformation(CodexRecordTransformation):
                     if previous[field] != context[field]:
                         context[field] = None
                         diagnostics.append({"source_record_id": event.record_id,
-                                            "execution_id": _execution_id(*key), "observed_at": _utc(event.timestamp),
+                                            "execution_id": _execution_id(*key), "observed_at": _valid_timestamp(event.timestamp),
                                             "message": f"Conflicting {field} for turn {event.turn_id}."})
             turn_contexts[turn_key] = context
         for event in events:
@@ -274,7 +274,7 @@ class UsageTransformation(CodexRecordTransformation):
                     context["repository_url"] = next(iter(candidates))
                 elif len(candidates) > 1:
                     diagnostics.append({"source_record_id": event.record_id, "execution_id": _execution_id(*key),
-                                        "observed_at": _utc(event.timestamp), "message": "Conflicting repository identities for working directory."})
+                                        "observed_at": _valid_timestamp(event.timestamp), "message": "Conflicting repository identities for working directory."})
                     context["project_conflict"] = True
             event_context[event.record_id] = context
 
@@ -293,11 +293,11 @@ class UsageTransformation(CodexRecordTransformation):
                 if execution_id:
                     partial_owners.add(execution_id)
                 diagnostics.append({"source_record_id": event.record_id, "execution_id": execution_id,
-                                    "observed_at": _utc(event.timestamp), "message": "Response usage has no verified thread or response ID."})
+                                    "observed_at": _valid_timestamp(event.timestamp), "message": "Response usage has no verified thread or response ID."})
                 continue
             if len(sessions_by_thread[event.thread_id]) != 1:
                 diagnostics.append({"source_record_id": event.record_id, "execution_id": None,
-                                    "observed_at": _utc(event.timestamp), "message": "Thread has conflicting session identities; usage withheld."})
+                                    "observed_at": _valid_timestamp(event.timestamp), "message": "Thread has conflicting session identities; usage withheld."})
                 continue
             key = (event.thread_id, event.response_id)
             response_groups.setdefault(key, []).append(event)
@@ -310,7 +310,7 @@ class UsageTransformation(CodexRecordTransformation):
             if len(signatures) != 1:
                 partial_owners.add(execution_id)
                 diagnostics.append({"source_record_id": observations[0].record_id, "execution_id": execution_id,
-                                    "observed_at": _utc(observations[0].timestamp), "message": "Conflicting response usage observations; usage withheld."})
+                                    "observed_at": _valid_timestamp(observations[0].timestamp), "message": "Conflicting response usage observations; usage withheld."})
                 continue
             event = observations[0]
             values, counters_complete = calculate_response_usage(event.token_counters["usage"])
@@ -318,14 +318,14 @@ class UsageTransformation(CodexRecordTransformation):
             observation_contexts = [event_context.get(item.record_id, {}) for item in observations]
             models = {item.get("model") for item in observation_contexts}
             directories = {item.get("directory") for item in observation_contexts}
-            timestamps = {_utc(item.timestamp) for item in observations}
+            timestamps = {_timestamp(_valid_timestamp(item.timestamp)) for item in observations}
             if len(models) > 1 or len(directories) > 1 or len(timestamps) > 1 or None in timestamps:
                 complete = False
                 diagnostics.append({"source_record_id": event.record_id, "execution_id": execution_id,
                                     "observed_at": None, "message": "Response attribution or timestamp is incomplete or conflicting."})
             if not counters_complete:
                 diagnostics.append({"source_record_id": event.record_id, "execution_id": execution_id,
-                                    "observed_at": _utc(event.timestamp), "message": "Response counters are invalid or incomplete."})
+                                    "observed_at": _valid_timestamp(event.timestamp), "message": "Response counters are invalid or incomplete."})
             context = observation_contexts[0].copy()
             if len(models) > 1:
                 context["model"] = None
@@ -336,7 +336,7 @@ class UsageTransformation(CodexRecordTransformation):
                 context.get("directory"), context.get("repository_url")
             )
             rows.append(CodexUsage(hashlib.sha256(json.dumps([thread, response]).encode()).hexdigest(),
-                                   event.record_id, execution_id, next(iter(timestamps)) if len(timestamps) == 1 else None, None,
+                                   event.record_id, execution_id, _valid_timestamp(event.timestamp) if len(timestamps) == 1 else None, None,
                                    context.get("directory"), project_key, project_label, context.get("model"),
                                    **values, coverage="complete" if complete else "partial", counter_provenance="response"))
 
@@ -348,9 +348,9 @@ class UsageTransformation(CodexRecordTransformation):
                 owner = (event.session_id, event.thread_id)
                 owner_logs.setdefault(owner, set()).add(record_logs[event.record_id])
                 if isinstance((event.token_counters or {}).get("usage"), dict):
-                    timestamp = _utc(event.timestamp)
+                    timestamp = _valid_timestamp(event.timestamp)
                     response_times.setdefault(owner, []).append(
-                        datetime.fromisoformat(timestamp.replace("Z", "+00:00")) if timestamp else None
+                        _timestamp(timestamp)
                     )
         legacy_events = []
         originals = {}
@@ -359,12 +359,12 @@ class UsageTransformation(CodexRecordTransformation):
             if not event.thread_id:
                 if event.token_counters:
                     diagnostics.append({"source_record_id": event.record_id, "execution_id": None,
-                                        "observed_at": _utc(event.timestamp), "message": "Token owner is unknown; usage withheld."})
+                                        "observed_at": _valid_timestamp(event.timestamp), "message": "Token owner is unknown; usage withheld."})
                 continue
             if len(sessions_by_thread[event.thread_id]) != 1:
                 if event.token_counters and not isinstance(event.token_counters.get("usage"), dict):
                     diagnostics.append({"source_record_id": event.record_id, "execution_id": None,
-                                        "observed_at": _utc(event.timestamp), "message": "Thread has conflicting session identities; legacy usage withheld."})
+                                        "observed_at": _valid_timestamp(event.timestamp), "message": "Thread has conflicting session identities; legacy usage withheld."})
                 continue
             owner = (event.session_id, event.thread_id)
             if len(owner_logs[owner]) > 1:
@@ -372,15 +372,15 @@ class UsageTransformation(CodexRecordTransformation):
                     execution_id = _execution_id(*owner)
                     partial_owners.add(execution_id)
                     diagnostics.append({"source_record_id": event.record_id, "execution_id": execution_id,
-                                        "observed_at": _utc(event.timestamp), "message": "Legacy counters span multiple source logs; overlap is unknown."})
+                                        "observed_at": _valid_timestamp(event.timestamp), "message": "Legacy counters span multiple source logs; overlap is unknown."})
                 continue
             if isinstance((event.token_counters or {}).get("usage"), dict):
                 response_started.add(owner)
             if owner in response_started:
                 continue
             if event.token_counters and owner in response_times:
-                timestamp = _utc(event.timestamp)
-                observed = datetime.fromisoformat(timestamp.replace("Z", "+00:00")) if timestamp else None
+                timestamp = _valid_timestamp(event.timestamp)
+                observed = _timestamp(timestamp)
                 times = response_times[owner]
                 if observed is None or any(value is None or observed >= value for value in times):
                     execution_id = _execution_id(*owner)
@@ -404,11 +404,11 @@ class UsageTransformation(CodexRecordTransformation):
             )
             values = {name: increment.values.get(name) for name in CodexUsage.__dataclass_fields__
                       if name.endswith("_tokens")}
-            rows.append(CodexUsage(event.record_id, event.record_id, increment.session_id, _utc(event.timestamp),
+            rows.append(CodexUsage(event.record_id, event.record_id, increment.session_id, _valid_timestamp(event.timestamp),
                                    previous.get(increment.session_id), context.get("directory"), project_key,
                                    project_label, increment.model, **values,
                                    coverage="complete" if increment.complete else "partial", counter_provenance="legacy_delta"))
-            previous[increment.session_id] = _utc(event.timestamp)
+            previous[increment.session_id] = _valid_timestamp(event.timestamp)
         affected_logs = {record_logs[item["source_record_id"]] for item in diagnostics
                          if item["source_record_id"] in record_logs}
         rows = [replace(row, coverage="partial")
