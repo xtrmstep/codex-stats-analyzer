@@ -90,7 +90,7 @@ Read local Codex session files from:
 - `%USERPROFILE%\.codex\archived_sessions`
 - Additional configured directories
 
-Read source JSONL files without modifying them. Preserve their original records locally so usage can be rebuilt after the source files are moved or removed. See [Raw collection](./02-architecture/02-design/030-collection-and-accounting.md#raw-collection).
+Read source JSONL files without modifying them. Preserve their original records locally so usage can be rebuilt after the source files are moved or removed. See [Raw collection](./02-architecture/02-design/000-system-overview.md#raw-collection).
 
 ### 3.2 Extracted information
 
@@ -109,7 +109,7 @@ Never treat mentions of a skill or subagent in ordinary conversation text as pro
 
 ### 3.3 Token accounting
 
-Calculate consumption from recorded response usage and supported legacy counter deltas. Apply the [rebuild and accounting rules](./02-architecture/02-design/030-collection-and-accounting.md#usage-rebuild-and-accounting) before grouping or filtering usage.
+Calculate consumption from recorded response usage and supported legacy counter deltas. Apply the [rebuild and accounting rules](./02-architecture/02-design/000-system-overview.md#usage-rebuild-and-accounting) before grouping or filtering usage.
 
 Track:
 
