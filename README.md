@@ -26,7 +26,7 @@ Supported structures include session metadata, turn context, response items, cum
 
 ## Filters, labels and runs
 
-Filters intersect across UTC date, project, model, session, role, agent, labels, task type, execution mode and runs. Date ranges are inclusive UTC calendar days. Missing fields are excluded when their dimension is filtered. Chart/table groups may overlap, so their values need not add to the global total.
+Overview filters intersect across recorded date, project, model, session, role and agent. Date ranges use inclusive recorded calendar days; time buckets use recorded clock labels, with weeks starting Monday. Missing fields are excluded when their dimension is filtered. Chart/table groups may overlap, so their values need not add to the global total.
 
 Use **Manage manual labels** to create free-form labels or structured key/value labels and bulk-assign them to sessions and runs. Runs inherit session labels; explicit and inherited labels are shown separately. Label edits preserve assignments; deletion removes the label from assignments. Labels are manual classifications, not evidence that a skill or subagent was used.
 
@@ -40,7 +40,7 @@ Use **Experiment comparison** to define at least two named groups, choose filter
 
 Current comparisons recalculate from the latest source and annotation data. **Record current calculation** adds a timestamped history point with its global filter context; recalculation alone does not add history. Changing a saved group's definition or selected metrics clears that experiment's history. History points with different filter contexts may not be directly comparable.
 
-Download buttons export the displayed filtered session, run and comparison tables as CSV. Files use UTF-8 with BOM, standard CSV quoting, blank unknown values and UTC ISO 8601 timestamps where provided. Column names identify token, percentage and second units; coverage and provenance identify partial and estimated values.
+Download buttons export the displayed filtered session, run and comparison tables as CSV. Files use UTF-8 with BOM, standard CSV quoting, blank unknown values and recorded ISO 8601 timestamps with their offsets where provided. Column names identify token, percentage and second units; coverage and provenance identify partial and estimated values.
 
 ## Local data and recovery
 

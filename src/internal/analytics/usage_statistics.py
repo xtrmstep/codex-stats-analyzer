@@ -1,12 +1,13 @@
 """Coverage-aware reporting over one committed SQLite snapshot."""
 
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta
 import json
 import sqlite3
 from uuid import uuid4
 
 import pandas as pd
+from internal.analytics.token_accounting import _timestamp as _instant
 from internal.ingestion.collection import CodexLogReader
 from internal.ingestion.parser import parse_collected
 from internal.ingestion.transformations import _project
@@ -32,7 +33,8 @@ class StatsRequest:
 
     start: pd.Timestamp | None = None
     end: pd.Timestamp | None = None
-    time_zone: str = "UTC"
+    start_date: date | None = None
+    end_date: date | None = None
     bucket: str = "daily"
     agent_grouping: str = "thread"
     marker: TimeMarker | None = None
@@ -110,7 +112,25 @@ def _timestamp(value):
     stamp = pd.Timestamp(value)
     if pd.isna(stamp) or stamp.tzinfo is None:
         raise ValueError("Report timestamps must have a time zone.")
-    return stamp.tz_convert("UTC")
+    return stamp
+
+
+
+def _date_matches(stamp, request):
+    if stamp is None:
+        return request.start_date is None and request.end_date is None
+    day = stamp.date()
+    return ((request.start_date is None or day >= request.start_date) and
+            (request.end_date is None or day <= request.end_date))
+
+
+def _diagnostic_matches(item, request):
+    try:
+        stamp = _timestamp(item.get("observed_at"))
+    except (TypeError, ValueError, OverflowError):
+        stamp = None
+    # Untimed diagnostics remain relevant because they cannot be placed.
+    return stamp is None or _date_matches(stamp, request)
 
 
 def _agent(row, grouping):
@@ -124,9 +144,9 @@ def _agent(row, grouping):
 def _bucket(value, request):
     if value is None:
         return None
-    local = value.tz_convert(request.time_zone)
+    local = value.tz_localize(None)
     if request.bucket == "hourly":
-        return local.floor("h", ambiguous=False, nonexistent="shift_forward")
+        return local.floor("h")
     day = local.normalize()
     if request.bucket == "daily":
         return day
@@ -194,21 +214,25 @@ class UsageCalculator:
         for (project, agent, bucket), group in grouped.items():
             group_start, group_end = start, end
             if bucket is not None:
-                bucket_start = bucket.tz_convert("UTC")
-                if request.bucket == "hourly":
-                    bucket_end = bucket_start + pd.Timedelta(hours=1)
-                elif request.bucket == "daily":
-                    bucket_end = (bucket + pd.DateOffset(days=1)).tz_convert("UTC")
-                elif request.bucket == "weekly":
-                    bucket_end = (bucket + pd.DateOffset(days=7)).tz_convert("UTC")
+                offsets = {row["observed"].utcoffset() for row in group if row["observed"] is not None}
+                if len(offsets) == 1:
+                    zone = next(row["observed"].tzinfo for row in group if row["observed"] is not None)
+                    bucket_start = bucket.tz_localize(zone)
+                    if request.bucket == "hourly":
+                        bucket_end = bucket_start + pd.Timedelta(hours=1)
+                    elif request.bucket == "daily":
+                        bucket_end = bucket_start + pd.Timedelta(days=1)
+                    elif request.bucket == "weekly":
+                        bucket_end = bucket_start + pd.Timedelta(days=7)
+                    else:
+                        bucket_end = bucket_start + pd.DateOffset(months=1)
+                    group_start = max(start, bucket_start) if start is not None else bucket_start
+                    group_end = min(end, bucket_end) if end is not None else bucket_end
                 else:
-                    bucket_end = (bucket + pd.DateOffset(months=1)).tz_convert("UTC")
-                group_start = max(start, bucket_start) if start is not None else bucket_start
-                group_end = min(end, bucket_end) if end is not None else bucket_end
-            if bucket is not None:
+                    group_start = group_end = None
                 group = [{**row, "uncertain": row["uncertain"] or (
-                    row["counter_provenance"] == "legacy_delta" and group_start is not None
-                    and (row["prior"] is None or row["prior"] < group_start)
+                    row["counter_provenance"] == "legacy_delta"
+                    and (row["prior"] is None or _bucket(row["prior"], request) != bucket)
                 )} for row in group]
             results.append(_measure(group, scope, group_start, group_end, project, agent, bucket, diagnostics))
         return results
@@ -254,7 +278,7 @@ class StatsCalculation:
 
     def __init__(self, database_path):
         self.database_path = str(database_path)
-        self.report_time = pd.Timestamp(datetime.now(timezone.utc))
+        self.report_time = pd.Timestamp(datetime.now().astimezone())
         self.calculators = {
             "Project over time": ProjectUsageOverTimeCalculator(),
             "Agent over time": AgentUsageOverTimeCalculator(),
@@ -289,6 +313,8 @@ class StatsCalculation:
         diagnostics = self.diagnostics
         parents = self.parents
         start, end = _timestamp(request.start), _timestamp(request.end)
+        if request.start_date and request.end_date and request.start_date > request.end_date:
+            raise ValueError("The reporting start date must not be after the end date.")
         if start is not None and end is not None and start >= end:
             raise ValueError("The reporting end must be after the start.")
         selected = []
@@ -299,6 +325,10 @@ class StatsCalculation:
                 continue
             row["observed"] = _timestamp(row["observed_at"])
             row["prior"] = _timestamp(row["prior_observed_at"])
+            row["observed_key"] = _instant(row["observed_at"])
+            row["prior_key"] = _instant(row["prior_observed_at"])
+            if not _date_matches(row["observed"], request):
+                continue
             selected.append(row)
         thread_lookup = {(thread["session_id"], thread["thread_id"]): thread for thread in self.threads}
         observations = []
@@ -315,32 +345,55 @@ class StatsCalculation:
                 stamp = _timestamp(event.timestamp) if event.timestamp else None
             except (TypeError, ValueError, OverflowError):
                 stamp = None
-            observations.append((event.session_id, thread["execution_id"], stamp))
+            if _date_matches(stamp, request):
+                observations.append((event.session_id, thread["execution_id"], stamp, _instant(event.timestamp)))
         observed = ([row["observed"] for row in selected if row["observed"] is not None]
-                    + [stamp for _, _, stamp in observations if stamp is not None])
+                    + [stamp for _, _, stamp, _ in observations if stamp is not None])
         effective_start = start if start is not None else (_timestamp(request.resolved_start) or min(observed, default=None))
         effective_end = end if end is not None else (_timestamp(request.resolved_end) or max(
             self.report_time, max(observed) + pd.Timedelta(nanoseconds=1) if observed else self.report_time
         ))
+        if request.start_date or request.end_date:
+            offsets = {stamp.utcoffset() for stamp in observed}
+            if len(offsets) == 1:
+                zone = observed[0].tzinfo
+                if request.start_date:
+                    effective_start = pd.Timestamp(request.start_date, tz=zone)
+                if request.end_date:
+                    effective_end = pd.Timestamp(request.end_date + timedelta(days=1), tz=zone)
+            else:
+                # Mixed offsets do not identify a common instant interval.
+                effective_start = effective_end = None
         scopes = [("Full selected period", start, effective_start)]
         if request.marker:
             marker = _timestamp(request.marker.timestamp)
-            cutoff = max(effective_start, marker) if effective_start is not None else marker
-            scopes.append((f"Since {request.marker.name}", cutoff, cutoff))
+            cutoff = max(start, marker) if start is not None else marker
+            display_start = max(effective_start, cutoff) if effective_start is not None else cutoff
+            scopes.append((f"Since {request.marker.name}", cutoff, display_start))
         result = {}
         for scope, cutoff, display_start in scopes:
             scoped_sessions = request.marker.session_ids if request.marker and scope != "Full selected period" else None
-            empty = cutoff is not None and cutoff >= effective_end
+            empty = cutoff is not None and effective_end is not None and cutoff >= effective_end
+            if cutoff is not None and request.end_date is not None:
+                # Every recorded offset defines its own exclusive end of the
+                # selected written day; do not collapse them to one zone.
+                offsets = {stamp.tzinfo for stamp in observed if stamp is not None}
+                if not offsets:
+                    offsets = {cutoff.tzinfo}
+                ends = [pd.Timestamp(request.end_date + timedelta(days=1), tz=offset) for offset in offsets]
+                empty = all(cutoff >= boundary for boundary in ends)
+            cutoff_key = _instant(request.marker.timestamp) if request.marker and scope != "Full selected period" else (_instant(start.isoformat()) if start is not None else None)
             window = []
             for original in selected:
                 if scoped_sessions is not None and original["session_id"] not in scoped_sessions:
                     continue
                 row = original.copy()
                 observed_at = row["observed"]
-                if (cutoff is not None and (observed_at is None or observed_at < cutoff)) or (end is not None and (observed_at is None or observed_at >= end)):
+                if (cutoff_key is not None and (row["observed_key"] is None or row["observed_key"] < cutoff_key)) or (end is not None and (observed_at is None or observed_at >= end)):
                     continue
-                row["uncertain"] = bool(row["counter_provenance"] == "legacy_delta" and cutoff is not None
-                                        and (row["prior"] is None or row["prior"] < cutoff))
+                row["uncertain"] = bool(row["counter_provenance"] == "legacy_delta" and (
+                    (cutoff_key is not None and (row["prior_key"] is None or row["prior_key"] < cutoff_key)) or
+                    (request.start_date is not None and (row["prior"] is None or row["prior"].date() < request.start_date))))
                 window.append(row)
             included = {row["execution_id"] for row in window if row["execution_id"]}
             overlapping = set()
@@ -356,15 +409,19 @@ class StatsCalculation:
                         and row["counter_provenance"] == "legacy_delta"]
             if excluded:
                 window = [row for row in window if row not in excluded]
-            scoped_diagnostics = diagnostics + ([{"message": "Overlapping legacy agent counters withheld."}] if excluded else [])
+            scoped_diagnostics = [item for item in diagnostics if _diagnostic_matches(item, request)
+                                  and (cutoff_key is None or not item.get("observed_at")
+                                       or (_instant(item["observed_at"]) is not None
+                                           and _instant(item["observed_at"]) >= cutoff_key))]
+            scoped_diagnostics += ([{"message": "Overlapping legacy agent counters withheld."}] if excluded else [])
             summary = _measure(window, scope, display_start, effective_end, diagnostics=scoped_diagnostics, empty=empty)
             if not empty:
                 observed_sessions = {row["session_id"] for row in window if row["session_id"]}
                 observed_agents = {row["execution_id"] for row in window if row["execution_id"]}
-                for session_id, execution_id, stamp in observations:
+                for session_id, execution_id, stamp, stamp_key in observations:
                     if scoped_sessions is not None and session_id not in scoped_sessions:
                         continue
-                    if (cutoff is not None and (stamp is None or stamp < cutoff)) or (end is not None and (stamp is None or stamp >= end)):
+                    if (cutoff_key is not None and (stamp_key is None or stamp_key < cutoff_key)) or (end is not None and (stamp is None or stamp >= end)):
                         continue
                     observed_sessions.add(session_id)
                     observed_agents.add(execution_id)

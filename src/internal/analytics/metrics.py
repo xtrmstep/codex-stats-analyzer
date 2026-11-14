@@ -1,7 +1,7 @@
 """Shared, Streamlit-independent filtering and metrics over token increments."""
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date
 
 import pandas as pd
 
@@ -15,7 +15,7 @@ from internal.metadata.labels import assigned, matches
 class Filters:
     """Intersect optional selections; an empty selection matches nothing.
 
-    Dates are inclusive UTC calendar dates. Missing dimensions match only when
+    Dates are inclusive recorded calendar dates. Missing dimensions match only when
     no filter for that dimension is selected.
     """
 
@@ -29,7 +29,6 @@ class Filters:
     label_mode: str = "all"
     task_types: frozenset[str] | None = None
     execution_modes: frozenset[str] | None = None
-    time_zone: str = "UTC"
 
 
 @dataclass(frozen=True)
@@ -44,7 +43,19 @@ class Metrics:
     provenance: tuple[str, ...]
 
 
-_COLUMNS = ("reference", "session", "agent", "parent", "project", "model", "agent_role", "timestamp", "increment")
+_COLUMNS = ("reference", "session", "agent", "parent", "project", "model", "agent_role", "timestamp", "timestamp_text", "increment")
+
+
+
+def _recorded_timestamp(value):
+    """Parse a timestamp without changing its recorded clock or offset."""
+    if value is None:
+        return None
+    try:
+        stamp = pd.Timestamp(value)
+        return stamp if not pd.isna(stamp) and stamp.tzinfo is not None else None
+    except (ValueError, TypeError, OverflowError):
+        return None
 
 
 def build_dataset(events: list[Event], increments: list[Increment]) -> pd.DataFrame:
@@ -71,22 +82,22 @@ def build_dataset(events: list[Event], increments: list[Increment]) -> pd.DataFr
         rows.append({"reference": event.reference, "session": event.session_id,
                      "agent": event.thread_id or event.session_id, "parent": event.parent_agent_id,
                      "project": context["project"], "model": context["model"],
-                     "agent_role": context["agent_role"], "timestamp": event.timestamp,
+                     "agent_role": context["agent_role"], "timestamp": event.timestamp, "timestamp_text": event.timestamp,
                      "increment": None})
     for increment in increments:
         context = context_by_reference.get(increment.reference, {})
         rows.append({"reference": increment.reference, "session": increment.session_id,
                      "agent": increment.agent_id, "parent": increment.parent_agent_id,
                      "project": context.get("project"), "model": increment.model,
-                     "agent_role": context.get("agent_role"), "timestamp": increment.timestamp,
+                     "agent_role": context.get("agent_role"), "timestamp": increment.timestamp, "timestamp_text": increment.timestamp,
                      "increment": increment})
     frame = pd.DataFrame(rows, columns=_COLUMNS)
-    frame["timestamp"] = pd.to_datetime(frame["timestamp"], format="mixed", utc=True, errors="coerce")
+    frame["timestamp"] = frame["timestamp"].map(_recorded_timestamp)
     return frame
 
 
 def filter_dataset(frame: pd.DataFrame, selection: Filters, annotations: dict | None = None) -> pd.DataFrame:
-    """Apply all selected dimensions and inclusive UTC dates by intersection."""
+    """Apply all selected dimensions and inclusive recorded dates by intersection."""
     if selection.start_date and selection.end_date and selection.start_date > selection.end_date:
         raise ValueError("Start date must not be after end date.")
     mask = pd.Series(True, index=frame.index, dtype=bool)
@@ -94,10 +105,11 @@ def filter_dataset(frame: pd.DataFrame, selection: Filters, annotations: dict | 
                              ("session", selection.sessions), ("agent_role", selection.agent_roles)):
         if selected is not None:
             mask &= frame[column].isin(selected)
+    dates = frame["timestamp"].map(lambda value: value.date() if value is not None and not pd.isna(value) else None)
     if selection.start_date:
-        mask &= frame["timestamp"] >= pd.Timestamp(selection.start_date, tz=selection.time_zone).tz_convert("UTC")
+        mask &= dates.map(lambda value: value is not None and value >= selection.start_date)
     if selection.end_date:
-        mask &= frame["timestamp"] < pd.Timestamp(selection.end_date + timedelta(days=1), tz=selection.time_zone).tz_convert("UTC")
+        mask &= dates.map(lambda value: value is not None and value <= selection.end_date)
     manual = any(value is not None for value in (selection.label_ids, selection.task_types, selection.execution_modes))
     if manual:
         if annotations is None:
@@ -158,22 +170,22 @@ def grouped(frame: pd.DataFrame, events: list[Event], dimension: str) -> list[tu
 
 
 def time_buckets(frame: pd.DataFrame, events: list[Event], frequency: str) -> list[tuple[pd.Timestamp | None, Metrics]]:
-    """Group by UTC day, Monday-start week, or calendar month; keep unknown dates."""
-    if frequency not in {"daily", "weekly", "monthly"}:
-        raise ValueError("Frequency must be daily, weekly or monthly.")
+    """Group by recorded hour, day, Monday-start week or calendar month."""
+    if frequency not in {"hourly", "daily", "weekly", "monthly"}:
+        raise ValueError("Unsupported frequency.")
+    def bucket(value):
+        if value is None or pd.isna(value):
+            return None
+        local = value.tz_localize(None)
+        day = local.normalize()
+        if frequency == "hourly":
+            return local.floor("h")
+        if frequency == "weekly":
+            return day - pd.Timedelta(days=day.dayofweek)
+        if frequency == "monthly":
+            return day.replace(day=1)
+        return day
     dated = frame.copy()
-    day = dated["timestamp"].dt.floor("D")
-    if frequency == "daily":
-        dated["bucket"] = day
-    elif frequency == "weekly":
-        dated["bucket"] = day - pd.to_timedelta(day.dt.dayofweek, unit="D")
-    else:
-        dated["bucket"] = pd.to_datetime(day.dt.strftime("%Y-%m-01"), utc=True, errors="coerce")
+    dated["bucket"] = dated["timestamp"].map(bucket)
     return [(None if pd.isna(key) else key, summarize(group, events))
             for key, group in dated.groupby("bucket", dropna=False, sort=True)]
-
-
-
-
-
-

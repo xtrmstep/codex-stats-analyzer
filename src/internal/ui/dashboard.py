@@ -9,10 +9,10 @@ import plotly.express as px
 import streamlit as st
 
 from internal.analytics.agents import analyze_agents
-from internal.analytics.token_accounting import Total, calculate_increments
+from internal.analytics.token_accounting import Total, _timestamp as _instant, calculate_increments
 from internal.analytics.metrics import Filters, build_dataset, filter_dataset
 from internal.ingestion.collection import CodexLogImporter, CodexLogReader, DatabaseWriter
-from internal.ui.statistics_ui import display_timezone, marker_editor, marker_selector, render_statistics
+from internal.ui.statistics_ui import marker_editor, marker_selector, render_statistics
 from internal.analytics.usage_statistics import StatsCalculation
 from internal.ui.exports import csv_bytes, SESSION_COLUMNS
 from internal.ui.session_comparisons import render_session_comparisons
@@ -63,7 +63,6 @@ def _render(sources, writer, page, start, end, range_ready):
     with configuration:
         st.subheader("Overview configuration")
         refresh_requested = st.button("Refresh sources")
-        zone = display_timezone()
         marker = marker_selector(writer)
         bucket = st.radio("Time aggregation", ["hourly", "daily", "weekly", "monthly"], index=1, horizontal=True)
         grouping = st.radio("Agent grouping", ["thread", "name"], horizontal=True)
@@ -106,7 +105,7 @@ def _render(sources, writer, page, start, end, range_ready):
         selected_projects = st.multiselect("Projects", sorted({row[0] for row in projects}))
         project_keys = frozenset(selected_projects) if selected_projects else None
         source_projects = frozenset(row[1] for row in projects if row[0] in selected_projects and row[1])
-        selection = Filters(start_date=start, end_date=end, time_zone=zone,
+        selection = Filters(start_date=start, end_date=end,
                             projects=source_projects if project_keys is not None else None,
                             models=_options(frame, "model", "Models"),
                             sessions=_options(frame, "session", "Sessions"),
@@ -121,7 +120,7 @@ def _render(sources, writer, page, start, end, range_ready):
     if selected_agent != "All agents":
         selected = selected.loc[selected["agent"] == selected_agent].copy()
     report_request, report_calculator, report_result = render_statistics(
-        writer, report_calculator, selection, zone, marker, project_keys, selected_agent,
+        writer, report_calculator, selection, marker, project_keys, selected_agent,
         bucket, grouping, view, sort_by, sort_order
     )
     if selected.empty:
@@ -133,15 +132,16 @@ def _render(sources, writer, page, start, end, range_ready):
         session_rows = []
         for key in sessions:
             value = session_metrics.get(key)
-            times = selected.loc[selected["session"] == key, "timestamp"].dropna()
+            times = [value for value in selected.loc[selected["session"] == key, "timestamp_text"]
+                     if value and _instant(value) is not None]
             session_rows.append({"Session": key, "Tokens": value.totals["total_tokens"] if value else None,
                                  "Input": value.totals["input_tokens"] if value else None,
                                  "Output": value.totals["output_tokens"] if value else None,
                                  "Coverage": value.coverage if value else "unknown",
                                  "Provenance": "committed usage records",
                                  "Agents": value.agents if value else 0,
-                                 "First observed UTC": times.min().isoformat() if not times.empty else None,
-                                 "Last observed UTC": times.max().isoformat() if not times.empty else None})
+                                 "First observed": min(times, key=_instant) if times else None,
+                                 "Last observed": max(times, key=_instant) if times else None})
         if sort_by == "Total tokens":
             known = sorted((row for row in session_rows if row["Tokens"] is not None),
                            key=lambda row: row["Tokens"], reverse=sort_order == "Descending")
@@ -151,7 +151,7 @@ def _render(sources, writer, page, start, end, range_ready):
         st.dataframe(pd.DataFrame(session_rows), hide_index=True, use_container_width=True)
         st.download_button("Download filtered sessions CSV", csv_bytes(session_rows, SESSION_COLUMNS),
                            file_name="sessions.csv", mime="text/csv")
-        st.caption("CSV uses UTF-8 with BOM, UTC ISO 8601 timestamps, blank unknown values and token/second units indicated in the column names.")
+        st.caption("CSV uses UTF-8 with BOM, recorded ISO 8601 timestamps with offsets, blank unknown values and token/second units indicated in the column names.")
         session_ids = sorted(selected["session"].dropna().unique().tolist())
         if session_ids:
             session_id = st.selectbox("Session detail", session_ids)
@@ -205,13 +205,13 @@ def details(root, selected, events, increments, date_filter_active=False, calcul
                      "Cache %": _display(Total(totals.cache_percentage, totals.coverage == "complete"), "%"),
                      "First observed": agent.activity.first, "Last observed": agent.activity.last})
         activity = agent.activity
-        times = pd.to_datetime(
-            [event.timestamp for event in events if (event.thread_id or event.session_id) == agent_id
-             and event.reference in selected_references and event.timestamp],
-            format="mixed", utc=True, errors="coerce")
-        times = times[~times.isna()]
-        if len(times) > 1 and times.min() < times.max():
-            timeline.append({"Agent": agent_id, "Start": times.min(), "End": times.max(), "Evidence": "Observed activity span"})
+        times = [event.timestamp for event in events
+                 if (event.thread_id or event.session_id) == agent_id
+                 and event.reference in selected_references and event.timestamp
+                 and _instant(event.timestamp) is not None]
+        if len(times) > 1 and _instant(min(times, key=_instant)) < _instant(max(times, key=_instant)):
+            timeline.append({"Agent": agent_id, "Start": min(times, key=_instant),
+                             "End": max(times, key=_instant), "Evidence": "Observed activity span"})
         if (agent_id in selected_agents and not date_filter_active
                 and activity.verified_reference in selected_references
                 and activity.verified_start and activity.verified_end):
@@ -230,13 +230,15 @@ def details(root, selected, events, increments, date_filter_active=False, calcul
     st.caption("Timeline spans use matching events only and do not establish execution duration. The hierarchy table shows full context. Verified intervals are omitted when a date filter is active because their boundaries may lie outside it.")
     if timeline:
         timeline_frame = pd.DataFrame(timeline)
-        for column in ("Start", "End"):
-            timeline_frame[column] = pd.to_datetime(timeline_frame[column], format="mixed", utc=True, errors="coerce")
-        invalid = timeline_frame["Start"].isna() | timeline_frame["End"].isna() | (timeline_frame["End"] < timeline_frame["Start"])
+        parsed_start = timeline_frame["Start"].map(_instant)
+        parsed_end = timeline_frame["End"].map(_instant)
+        invalid = pd.Series([start is None or end is None or end < start
+                             for start, end in zip(parsed_start, parsed_end)], index=timeline_frame.index)
         if invalid.any():
             st.warning(f"{invalid.sum()} activity interval(s) have invalid endpoints and cannot be plotted.")
         timeline_frame = timeline_frame.loc[~invalid]
         if not timeline_frame.empty:
+            st.dataframe(timeline_frame, hide_index=True, use_container_width=True)
             st.plotly_chart(px.timeline(timeline_frame, x_start="Start", x_end="End", y="Agent", color="Evidence"), use_container_width=True)
         else:
             st.info("No activity intervals with two valid endpoints.")

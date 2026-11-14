@@ -20,3 +20,25 @@ Use the calendar date and clock time as recorded for report filtering and groupi
 - A record at `23:30-05:00` appears on the written date in filters, in the `23:00` hourly bucket, and with its recorded offset in observation labels and exports. Verify all four bucket sizes, mixed offsets, and a source timestamp already written in UTC. Charts, tables, and exports agree on the included records.
 - Exact marker comparisons treat equivalent instants equally. The full selected period and the marker window retain their existing scopes, and a legacy delta crossing the marker still reports uncertain attribution.
 - Filters and marker changes use the committed dataset. A failed refresh still shows the last successful publication. This task makes no changes to ingestion, counter accounting, SQLite schema, or historical data.
+
+## Issue Logs
+
+### Failed check 1
+- `src/internal/analytics/usage_statistics.py`: custom recorded-date ranges clear the effective end instant, so a marker after the selected period cannot trigger the required empty-window message.
+- The reporting-window acceptance criterion requires an empty intersection to remain visible.
+- Resolve marker-window emptiness using the selected dates and recorded offsets, without treating the date filter as a single global time zone; recheck mixed-offset boundaries and the displayed bounds.
+
+### Failed check 2
+- `src/internal/analytics/usage_statistics.py`: pandas timestamps truncate fractional digits beyond nanoseconds when comparing markers with observations; recorded values can contain more digits. Bucket rates are also always unknown even when all rows have the same offset and an elapsed interval is verifiable.
+- This violates exact marker comparisons and the requirement to leave rates unknown only where elapsed duration cannot be established.
+- Compare marker cutoffs with full-precision instant keys and calculate bucket durations when one recorded offset establishes the interval; retain unknown rates for mixed offsets.
+
+### Failed check 3
+- `src/internal/analytics/usage_statistics.py`: when a marker precedes a single-offset custom range, the marker window displays and uses the earlier marker as its effective start, which overstates elapsed duration.
+- The marker window must represent the intersection with the selected period and use verifiable bounds for rates.
+- Clamp the displayed/rate start to the selected range start when that bound is known, while retaining the exact marker instant for inclusion comparisons.
+
+### Failed check 4
+- `src/internal/ui/dashboard.py` formats parsed timestamps with `isoformat()`, which changes a source `Z` to `+00:00` and can truncate source precision in session and timeline details.
+- The task requires original timestamp representations to remain available in displayed observations and exports.
+- Retain timestamp text alongside parsed timestamps and use the original text for first/last observations and timeline endpoints while ordering by offset-aware instants.

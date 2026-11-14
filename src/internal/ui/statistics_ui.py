@@ -1,8 +1,7 @@
 """Streamlit controls and tables for committed usage measurements."""
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from dataclasses import replace
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import pandas as pd
 import plotly.express as px
@@ -54,21 +53,6 @@ def marker_editor(writer):
         st.rerun()
 
 
-def display_timezone():
-    """Select an IANA time zone for report bounds and bucket labels."""
-    def remember_timezone():
-        st.session_state["report_timezone"] = st.session_state["report_timezone_input"]
-
-    zone = st.text_input("Display time zone", value=st.session_state.get("report_timezone", "UTC"),
-                         key="report_timezone_input", on_change=remember_timezone)
-    try:
-        ZoneInfo(zone)
-    except (ZoneInfoNotFoundError, ValueError):
-        st.error("Enter a valid IANA time zone, such as Europe/Sofia.")
-        st.stop()
-    return zone
-
-
 def _number(value, suffix=""):
     if value is None:
         return "Unknown"
@@ -103,13 +87,11 @@ def _row(measurement, view=None):
     }
 
 
-def render_statistics(writer, calculator, selection, zone, marker, project_keys, selected_agent,
+def render_statistics(writer, calculator, selection, marker, project_keys, selected_agent,
                       bucket, grouping, view, sort_by, sort_order, record_ids=None):
     """Calculate and render both scopes and a selected breakdown."""
-    start = pd.Timestamp(selection.start_date, tz=zone).tz_convert("UTC") if selection.start_date else None
-    end = (pd.Timestamp(selection.end_date + timedelta(days=1), tz=zone).tz_convert("UTC")
-           if selection.end_date else None)
-    request = StatsRequest(start=start, end=end, time_zone=zone, bucket=bucket, agent_grouping=grouping,
+    request = StatsRequest(start_date=selection.start_date, end_date=selection.end_date,
+                           bucket=bucket, agent_grouping=grouping,
                            marker=marker, projects=project_keys, models=selection.models,
                            sessions=selection.sessions, roles=selection.agent_roles,
                            agents=frozenset({selected_agent}) if selected_agent != "All agents" else None,
@@ -121,14 +103,15 @@ def render_statistics(writer, calculator, selection, zone, marker, project_keys,
     for scope_index, (scope, (summary, groups)) in enumerate(result.items()):
         st.subheader(scope)
         if marker and scope != "Full selected period":
-            st.caption(f"Marker: {pd.Timestamp(marker.timestamp).tz_convert(zone).isoformat()}")
+            st.caption(f"Marker: {marker.timestamp}")
         export_rows.append(_row(summary))
         if summary.empty_window:
             st.info("No time in range")
             continue
-        start_label = summary.start.tz_convert(zone).isoformat() if summary.start is not None else "Unknown"
-        end_label = summary.end.tz_convert(zone).isoformat() if summary.end is not None else "Unknown"
-        st.caption(f"Effective period: {start_label} to {end_label} (end exclusive). Coverage: {summary.coverage}.")
+        start_label = summary.start.isoformat() if summary.start is not None else "Unknown"
+        end_label = summary.end.isoformat() if summary.end is not None else "Unknown"
+        date_label = f"Recorded dates: {selection.start_date or 'unbounded'} to {selection.end_date or 'unbounded'} (inclusive). " if selection.start_date or selection.end_date else ""
+        st.caption(f"{date_label}Effective instants: {start_label} to {end_label}. Coverage: {summary.coverage}.")
         columns = st.columns(5)
         columns[0].metric("Total tokens", _number(summary.totals["total_tokens"]))
         columns[1].metric("Input tokens", _number(summary.totals["input_tokens"]))

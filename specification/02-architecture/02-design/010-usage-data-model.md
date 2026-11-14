@@ -1,6 +1,6 @@
 # Usage data model
 
-SQLite stores the first four classes. Requests and measurements live in memory for each report. Store valid source timestamps exactly as recorded, including their offset and fractional precision. Store application-generated timestamps in machine-local time with an explicit offset so saved timestamps can serve as cutoffs. Use the dashboard time zone for date selection and display.
+SQLite stores the first four classes. Requests and measurements live in memory for each report. Store valid source timestamps exactly as recorded, including their offset and fractional precision. Store application-generated timestamps in machine-local time with an explicit offset so saved timestamps can serve as cutoffs. Use recorded calendar dates and clock times for filtering and grouping, and retain recorded offsets for display and instant comparisons.
 
 ## Class overview
 
@@ -51,7 +51,7 @@ classDiagram
     }
     class StatsRequest {
         filters
-        selected_bounds, time_zone
+        selected_bounds
         time_bucket_size
         agent_grouping
     }
