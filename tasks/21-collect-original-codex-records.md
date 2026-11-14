@@ -9,7 +9,7 @@ Keep the original data available for future changes to the parser or usage model
 ## Work
 
 - Implement [`CollectedCodexRecord`](../specification/02-architecture/02-design/010-usage-data-model.md#collectedcodexrecord), [`CodexLogReader`](../specification/02-architecture/02-design/020-backend-class-design.md#codexlogreader), [`DatabaseWriter`](../specification/02-architecture/02-design/020-backend-class-design.md#databasewriter), and the collection portion of [`CodexLogImporter`](../specification/02-architecture/02-design/020-backend-class-design.md#codexlogimporter). Define the initial versioned SQLite schema and place the generated database in the existing ignored `data/` directory.
-- Follow the [raw collection workflow](../specification/02-architecture/02-design/000-system-overview.md#raw-collection). Provide a source-ordered read of committed raw records for replay.
+- Follow the [raw collection workflow](../specification/02-architecture/02-design/030-collection-and-accounting.md#raw-collection). Provide a source-ordered read of committed raw records for replay.
 - Reuse source configuration in `app.py` and applicable discovery logic in `parser.py`. The existing `parser.ingest()` opens files and decodes JSON in one pass. Extract the byte-reading path so collection can retain lines the parser cannot interpret.
 
 ## Acceptance Criteria

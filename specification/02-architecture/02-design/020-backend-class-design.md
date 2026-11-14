@@ -4,10 +4,10 @@
 
 | Class | Responsibility |
 | --- | --- |
-| `CodexLogImporter` | Collects and stores original records on refresh, runs registered transformations on a committed snapshot, reports diagnostics, and controls atomic publication. |
-| `CodexLogReader` | Discovers configured files and yields original lines with source positions, or reads an ordered SQLite snapshot through the same interface. |
-| `CodexRecordTransformation` | Defines an output type, destination mapping, and parser that turns an ordered snapshot into rows and diagnostics. |
-| `DatabaseWriter` | Uses Python's `sqlite3` to write collected records, transformed rows, and markers through destination mappings. |
+| <a name="codexlogimporter"></a>`CodexLogImporter` | Collects and stores original records on refresh, runs registered transformations on a committed snapshot, reports diagnostics, and controls atomic publication. |
+| <a name="codexlogreader"></a>`CodexLogReader` | Discovers configured files and yields original lines with source positions, or reads an ordered SQLite snapshot through the same interface. |
+| <a name="codexrecordtransformation"></a>`CodexRecordTransformation` | Defines an output type, destination mapping, and parser that turns an ordered snapshot into rows and diagnostics. |
+| <a name="databasewriter"></a>`DatabaseWriter` | Uses Python's `sqlite3` to write collected records, transformed rows, and markers through destination mappings. |
 
 ```mermaid
 classDiagram
@@ -16,7 +16,7 @@ classDiagram
     CodexLogImporter *-- DatabaseWriter : one writer
 ```
 
-Register [`CodexAgentThread`](./010-usage-data-model.md#codexagentthread) and [`CodexUsage`](./010-usage-data-model.md#codexusage) through the same transformation interface and share identity rules and parsing helpers. Parsing is independent of SQLite and the dashboard. Parsers may consult multiple records for identity, turn context, or legacy deltas. Use the same resolved owner for usage accounting and agent hierarchy. The writer provides transaction operations, and the importer sets publication boundaries. Keep schema definitions and versioned upgrades with the model's SQLite setup. See [collection and rebuild](./000-system-overview.md).
+Register [`CodexAgentThread`](./010-usage-data-model.md#codexagentthread) and [`CodexUsage`](./010-usage-data-model.md#codexusage) through the same transformation interface and share identity rules and parsing helpers. Parsing is independent of SQLite and the dashboard. Parsers may consult multiple records for identity, turn context, or legacy deltas. Use the same resolved owner for usage accounting and agent hierarchy. The writer provides transaction operations, and the importer sets publication boundaries. Keep schema definitions and versioned upgrades with the model's SQLite setup. See [collection and rebuild](./030-collection-and-accounting.md).
 
 ## Statistics classes
 
