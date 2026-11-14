@@ -44,15 +44,11 @@ The second block displays summary metrics and trend visualizations.
 
 #### 3.2.2.1 Overview KPIs
 
-Show total, input, and output tokens, input and output distribution, cache percentage, session and agent counts, processing speed, average daily tokens, and subagent token share where independently attributable. Distinguish observed facts, manual annotations, and estimates.
+Show total, input, and output tokens, input and output distribution, cache percentage, agent counts, processing speed, average daily tokens, and subagent token share where independently attributable. Distinguish observed facts, manual annotations, and estimates.
 
 #### 3.2.2.2 Trends and charts
 
-Show token trends by hour, day, week, or month. Include project and agent trends, agent usage by project, breakdowns by model and session, cached versus non-cached input, main-agent versus subagent usage, and a session details table. Agent trends and agent usage by project group threads by recorded agent name, falling back to role; show Unknown when neither is available. The agent filter selects individual threads. Use nicknames to identify individual executions where available. Support filtering, grouping, sorting, and CSV export.
-
-#### Agent hierarchy and timeline
-
-Show the main agent and its subagents for the selected session. List unlinked agents separately. Show the [agent and session metrics](../02-architecture/02-design/020-backend-class-design.md#agent-analysis) and a Gantt-style timeline highlighting overlap when supported by timestamps. Distinguish observed activity intervals from verified execution durations. Selecting an agent filters the usage charts.
+Show token trends by hour, day, week, or month. Include project and agent trends, agent usage by project, breakdowns by model, and cached versus non-cached input. Agent trends and agent usage by project group threads by recorded agent name, falling back to role; show Unknown when neither is available. The agent filter selects individual threads. Use nicknames to identify individual executions where available. Support filtering, grouping, sorting, and CSV export.
 
 #### Saved time markers
 
@@ -63,12 +59,6 @@ Users can create, rename, edit, and delete named timestamps. Markers are availab
 Filter by inclusive recorded calendar date, group using recorded clock labels (with weeks starting Monday), and display recorded timestamps and offsets. Compare marker instants using their offsets. When mixed offsets do not establish a single elapsed duration, leave the corresponding rate unknown.
 
 Show **Full selected period** and, when a marker is selected, **Since [marker name]** together. The latter is the intersection of the selected range and the time starting at the marker, inclusive. Apply the same filters to both. Show the marker timestamp and effective bounds, and display **No time in range** for an empty intersection. Place legacy deltas by observation time and flag uncertain attribution if a delta spans the cutoff. Use the [token accounting rules](../02-architecture/02-design/020-backend-class-design.md#token-accounting) for coverage and rates.
-
-#### Session comparisons
-
-Compare two or more groups of sessions using available filters and observed execution characteristics, such as model, skill usage, or execution mode. Show each group's session count, average and median tokens per session, output tokens, cache percentage, independently attributable subagent share, and elapsed duration where verified.
-
-Show results in a comparison table with aggregate bar charts and token-distribution box plots. Show absolute and percentage differences for token and duration metrics when calculable. Flag differences in model or other known conditions that affect comparability. Present the differences as observations and avoid causal claims.
 
 ## 3.3 Content behavior
 

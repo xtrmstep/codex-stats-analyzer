@@ -1,6 +1,6 @@
 # Codex Usage Analyzer
 
-A local Windows dashboard for inspecting Codex session activity, token counters, manual labels, runs and comparisons. It reads JSONL session files without modifying them. No Codex account or API credentials are required.
+A local Windows dashboard for inspecting Codex token counters and agent activity. It reads JSONL session files without modifying them. No Codex account or API credentials are required.
 
 ## Setup and start
 
@@ -14,33 +14,21 @@ For installation without network access, first prepare compatible Python 3.12 Wi
 py -3.12 -m pip download --only-binary=:all: -r requirements.txt -d wheelhouse
 ```
 
-Transfer the wheelhouse to the target machine and run `setup.bat "C:\path to\wheelhouse"`. Setup uses `--no-index` and installs only from that directory. Runtime is designed for local use. A synthetic browser workflow including saved runs and comparison history passed across restart with the Python application process restricted to loopback; physical network disconnection and browser-level network blocking have not been verified.
+Transfer the wheelhouse to the target machine and run `setup.bat "C:\path to\wheelhouse"`. Setup uses `--no-index` and installs only from that directory. Runtime is designed for local use.
 
 ## Sources and refresh
 
 `config.toml` lists source directories under `[sources].directories`; the defaults are `%USERPROFILE%\.codex\sessions` and `%USERPROFILE%\.codex\archived_sessions`. Add directories as TOML literal strings. Windows `%VARIABLE%` references are expanded and relative paths resolve from the project directory. Missing directories are reported. Run `.venv\Scripts\python.exe src\app.py --check-config` to check the configuration.
 
-Use **Refresh sources** to reread local files and recalculate analytics and saved comparisons. Parsing diagnostics include malformed and incomplete lines. Unavailable annotated sessions and run boundaries are reported without deleting metadata. Session/event references generally survive appends and archive moves; files with no session ID use their filename as a fallback, so renaming them changes that identity.
+Use **Refresh sources** to reread local files and recalculate analytics. Parsing diagnostics include malformed and incomplete lines. Session/event references generally survive appends and archive moves; files with no session ID use their filename as a fallback, so renaming them changes that identity.
 
 Supported structures include session metadata, turn context, response items, cumulative `event_msg.token_count` and `token_usage_record` counters. Explicit nested `source.subagent.thread_spawn` metadata and correlated `spawn_agent` tool results can provide relationships. Only supported explicit skill events are treated as skill evidence; ordinary conversation mentions are not. Unknown event shapes and unresolved links remain visible as diagnostics or unknown values. Not all Codex event variants are supported.
 
-## Filters, labels and runs
+## Filters and exports
 
-Overview filters intersect across recorded date, project, model, session, role and agent. Date ranges use inclusive recorded calendar days; time buckets use recorded clock labels, with weeks starting Monday. Missing fields are excluded when their dimension is filtered. Chart/table groups may overlap, so their values need not add to the global total.
+Overview filters intersect across recorded date, project, model, role and agent. Date ranges use inclusive recorded calendar days; time buckets use recorded clock labels, with weeks starting Monday. Session and thread identities remain internal to attribution and traceability. Missing fields are excluded when their dimension is filtered.
 
-Use **Manage manual labels** to create free-form labels or structured key/value labels and bulk-assign them to sessions and runs. Runs inherit session labels; explicit and inherited labels are shown separately. Label edits preserve assignments; deletion removes the label from assignments. Labels are manual classifications, not evidence that a skill or subagent was used.
-
-Use **Manage runs** to create, edit or delete a run from a session. Choose the whole session, timezone-aware timestamp boundaries, or stable start/end event references. Intervals are start-inclusive and end-exclusive. Whole-session runs expand when new events arrive. Overlapping run selections are deduplicated for global usage, while individual run totals may overlap.
-
-Run calculations include root-thread counters only; child usage is excluded because parent and child counter scopes are not resolved. Interval usage is estimated from counter observation times and may span boundaries. Partial and unknown amounts are labeled; unknown is not zero. Cached input is part of input and reasoning output is part of output, so neither is added twice. Hierarchy spans show first/last recorded activity, not verified execution duration. Main/subagent shares remain unknown where counter overlap cannot be resolved.
-
-## Comparisons and exports
-
-Use **Experiment comparison** to define at least two named groups, choose filters and metrics, then save or reopen the definition. Groups intersect the current global filters; the first group is the baseline. Tables show eligible counts and gaps, group overlaps and differences in recorded conditions. Differences are descriptive, not evidence of causation. Percentage changes are unknown when the baseline is zero or missing. Scores and outcomes are manual; unknown and partial outcomes do not count as failures.
-
-Current comparisons recalculate from the latest source and annotation data. **Record current calculation** adds a timestamped history point with its global filter context; recalculation alone does not add history. Changing a saved group's definition or selected metrics clears that experiment's history. History points with different filter contexts may not be directly comparable.
-
-Download buttons export the displayed filtered session, run and comparison tables as CSV. Files use UTF-8 with BOM, standard CSV quoting, blank unknown values and recorded ISO 8601 timestamps with their offsets where provided. Column names identify token, percentage and second units; coverage and provenance identify partial and estimated values.
+Download the displayed usage report as CSV. Files use UTF-8 with BOM, standard CSV quoting, blank unknown values and recorded ISO 8601 timestamps with their offsets where provided. Coverage identifies partial and estimated values.
 
 ## Local data and recovery
 

@@ -45,12 +45,11 @@ Dashboard and export use the same measurements. Calculate window summaries direc
 
 ## Agent analysis
 
-Build the two-level view from verified relationships between the main agent and its subagents. Keep unlinked agents separate when relationships are unknown. Agent roles and nicknames are optional metadata.
+Retain verified relationships between main agents and subagents for attribution and traceability. Agent roles and nicknames are optional metadata.
 
 | Scope | Metrics |
 | --- | --- |
 | Agent | Model, observed role and verified parent when available, token consumption, cache percentage, first and last recorded activity, and available execution status. |
-| Session | Participating agent count, main-agent usage, and combined subagent usage and share where independent usage can be established. |
 
 ### Token accounting
 

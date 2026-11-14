@@ -39,7 +39,6 @@ class StatsRequest:
     marker: TimeMarker | None = None
     projects: frozenset[str] | None = None
     models: frozenset[str] | None = None
-    sessions: frozenset[str] | None = None
     roles: frozenset[str] | None = None
     agents: frozenset[str] | None = None
     record_ids: frozenset[str] | None = None
@@ -61,7 +60,6 @@ class UsageMeasurement:
     coverage: str
     cache_percentage: float | None
     average_daily_tokens: float | None
-    sessions: int
     agents: int
     subagent_share: float | None = None
     empty_window: bool = False
@@ -155,7 +153,7 @@ def _bucket(value, request):
 def _measure(rows, scope, start, end, project=None, agent=None, bucket=None, diagnostics=(), empty=False):
     if empty:
         return UsageMeasurement(scope, start, end, project, agent, bucket,
-                                {field: None for field in TOKEN_FIELDS}, "unknown", None, None, 0, 0, empty_window=True)
+                                {field: None for field in TOKEN_FIELDS}, "unknown", None, None, 0, empty_window=True)
     totals = {}
     executions = {row["execution_id"] for row in rows if row["execution_id"]}
     relevant_diagnostics = []
@@ -192,7 +190,6 @@ def _measure(rows, scope, start, end, project=None, agent=None, bucket=None, dia
     days = (end - start).total_seconds() / 86400 if start is not None and end is not None else 0
     daily = totals["total_tokens"] / days if totals["total_tokens"] is not None and days > 0 else None
     return UsageMeasurement(scope, start, end, project, agent, bucket, totals, coverage, cache, daily,
-                            len({row["session_id"] for row in rows if row["session_id"]}),
                             len({row["execution_id"] for row in rows if row["execution_id"]}), share)
 
 
@@ -261,13 +258,6 @@ class ModelUsageCalculator(UsageCalculator):
         return None, row["model"], None
 
 
-class SessionUsageCalculator(UsageCalculator):
-    """Group usage by session."""
-
-    def key(self, row, request):
-        return None, row["session_id"], None
-
-
 class StatsCalculation:
     """Resolve report windows from a single committed database snapshot."""
 
@@ -279,7 +269,6 @@ class StatsCalculation:
             "Agent over time": AgentUsageOverTimeCalculator(),
             "Agent by project": AgentUsageByProjectCalculator(),
             "Model": ModelUsageCalculator(),
-            "Session": SessionUsageCalculator(),
         }
         connection = sqlite3.connect(self.database_path)
         connection.row_factory = sqlite3.Row
@@ -315,7 +304,7 @@ class StatsCalculation:
         selected = []
         for row in rows:
             if any(choices is not None and row[field] not in choices for field, choices in
-                   (("project_key", request.projects), ("model", request.models), ("session_id", request.sessions),
+                   (("project_key", request.projects), ("model", request.models),
                     ("role", request.roles), ("thread_id", request.agents), ("source_record_id", request.record_ids))):
                 continue
             row["observed"] = _timestamp(row["observed_at"])
@@ -333,7 +322,7 @@ class StatsCalculation:
                 continue
             project, _ = _project(event.project_path, event.repository_url)
             if any(choices is not None and value not in choices for value, choices in
-                   ((project, request.projects), (event.model, request.models), (event.session_id, request.sessions),
+                   ((project, request.projects), (event.model, request.models),
                     (thread["role"], request.roles), (event.thread_id, request.agents), (event.record_id, request.record_ids))):
                 continue
             try:
@@ -411,16 +400,14 @@ class StatsCalculation:
             scoped_diagnostics += ([{"message": "Overlapping legacy agent counters withheld."}] if excluded else [])
             summary = _measure(window, scope, display_start, effective_end, diagnostics=scoped_diagnostics, empty=empty)
             if not empty:
-                observed_sessions = {row["session_id"] for row in window if row["session_id"]}
                 observed_agents = {row["execution_id"] for row in window if row["execution_id"]}
                 for session_id, execution_id, stamp, stamp_key in observations:
                     if scoped_sessions is not None and session_id not in scoped_sessions:
                         continue
                     if (cutoff_key is not None and (stamp_key is None or stamp_key < cutoff_key)) or (end is not None and (stamp is None or stamp >= end)):
                         continue
-                    observed_sessions.add(session_id)
                     observed_agents.add(execution_id)
-                summary = replace(summary, sessions=len(observed_sessions), agents=len(observed_agents))
+                summary = replace(summary, agents=len(observed_agents))
             groups = {name: calculator.groups(window, request, scope, display_start, effective_end, scoped_diagnostics)
                       for name, calculator in self.calculators.items()}
             result[scope] = (summary, groups)

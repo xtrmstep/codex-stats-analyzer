@@ -68,7 +68,6 @@ def _row(measurement, view=None):
         "Project": measurement.project,
         "Agent": (measurement.agent or "Unknown") if view in {"Agent over time", "Agent by project"} else None,
         "Model": measurement.agent if view == "Model" else None,
-        "Session": measurement.agent if view == "Session" else None,
         "Time": measurement.bucket.isoformat() if measurement.bucket is not None else None,
         "Total tokens": measurement.totals["total_tokens"],
         "Input tokens": measurement.totals["input_tokens"],
@@ -81,7 +80,6 @@ def _row(measurement, view=None):
         "Daily average": measurement.average_daily_tokens,
         "Subagent share %": measurement.subagent_share,
         "Coverage": measurement.coverage,
-        "Sessions": measurement.sessions,
         "Agents": measurement.agents,
         "Empty window": measurement.empty_window,
     }
@@ -93,7 +91,7 @@ def render_statistics(writer, calculator, selection, marker, project_keys, selec
     request = StatsRequest(start_date=selection.start_date, end_date=selection.end_date,
                            bucket=bucket,
                            marker=marker, projects=project_keys, models=selection.models,
-                           sessions=selection.sessions, roles=selection.agent_roles,
+                           roles=selection.agent_roles,
                            agents=frozenset({selected_agent}) if selected_agent != "All agents" else None,
                            record_ids=record_ids)
     result = calculator.calculate(request)
@@ -121,7 +119,7 @@ def render_statistics(writer, calculator, selection, marker, project_keys, selec
         extra_columns = st.columns(2)
         extra_columns[0].metric("Processing speed", "Unknown")
         extra_columns[1].metric("Subagent share", _number(summary.subagent_share, "%"))
-        st.caption(f"Sessions: {summary.sessions:,} · Agent threads: {summary.agents:,}")
+        st.caption(f"Agent threads: {summary.agents:,}")
         st.caption("Legacy intervals crossing a boundary and potentially overlapping agent counters can make coverage partial.")
         components = [{"Component": label, "Tokens": summary.totals[field]} for label, field in
                       (("Cached input", "cached_input_tokens"), ("Non-cached input", "non_cached_input_tokens"),
@@ -136,15 +134,15 @@ def render_statistics(writer, calculator, selection, marker, project_keys, selec
             rows = known + [row for row in rows if row["Total tokens"] is None]
         else:
             rows.sort(key=lambda row: tuple(str(row[field] or "").casefold()
-                                            for field in ("Project", "Agent", "Model", "Session", "Time")),
+                                            for field in ("Project", "Agent", "Model", "Time")),
                       reverse=sort_order == "Descending")
         export_rows.extend(rows)
         if rows:
             table = pd.DataFrame(rows)
             x = {"Project over time": "Time", "Agent over time": "Time", "Agent by project": "Agent",
-                 "Model": "Model", "Session": "Session"}[view]
+                 "Model": "Model"}[view]
             color = {"Project over time": "Project", "Agent over time": "Agent", "Agent by project": "Project",
-                     "Model": "Model", "Session": "Session"}[view]
+                     "Model": "Model"}[view]
             if table["Total tokens"].notna().any():
                 chart = table.copy()
                 chart[color] = chart[color].fillna("Unknown")
@@ -155,8 +153,8 @@ def render_statistics(writer, calculator, selection, marker, project_keys, selec
         else:
             st.info("No usage matches this scope.")
     columns = {name: name.lower().replace(" ", "_").replace("%", "percentage") for name in
-               ("Measurement", "Scope", "Start", "End", "Project", "Agent", "Model", "Session", "Time", "Total tokens", "Input tokens",
+               ("Measurement", "Scope", "Start", "End", "Project", "Agent", "Model", "Time", "Total tokens", "Input tokens",
                 "Output tokens", "Cached input", "Non-cached input", "Cache-write input", "Reasoning output",
-                "Cache %", "Daily average", "Subagent share %", "Coverage", "Sessions", "Agents", "Empty window")}
+                "Cache %", "Daily average", "Subagent share %", "Coverage", "Agents", "Empty window")}
     st.download_button("Download usage CSV", csv_bytes(export_rows, columns), file_name="usage.csv", mime="text/csv")
     return request, calculator, result

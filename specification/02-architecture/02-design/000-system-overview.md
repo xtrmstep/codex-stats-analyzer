@@ -1,6 +1,6 @@
 # System overview
 
-The Codex Usage Analyzer is a local Windows application for understanding token usage, agent activity, and the efficiency of different execution configurations. Users can analyze usage by session, project, model, or agent, assess delegation overhead, and compare groups of sessions. The application works offline without Codex authentication, API access, or external services. It keeps a local copy of the logs so usage can be rebuilt after the source files move or disappear.
+The Codex Usage Analyzer is a local Windows application for understanding token usage, agent activity, and the efficiency of different execution configurations. Users can analyze usage by time, project, model, or agent. Session and thread IDs remain internal evidence for attribution and traceability. The application works offline without Codex authentication, API access, or external services. It keeps a local copy of the logs so usage can be rebuilt after the source files move or disappear.
 
 ## Core concepts
 

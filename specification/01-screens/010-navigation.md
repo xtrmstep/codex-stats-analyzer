@@ -50,6 +50,6 @@ These remain open for later UI specification work.
 
 ## 1.5 Filters
 
-Show **Filters** below **Navigation** when Overview is selected. It contains project, model, session, observed agent role, individual agent, execution mode, and saved time marker selection. The shared [date range](./020-header.md#22-header-elements) is in the header. Manual annotations uses its own editor controls in the main content area.
+Show **Filters** below **Navigation** when Overview is selected. It contains project, model, observed agent role, individual agent, execution mode, and saved time marker selection. The shared [date range](./020-header.md#22-header-elements) is in the header. Manual annotations uses its own editor controls in the main content area.
 
 The filters determine which records contribute to Overview results. The saved time marker adds the [second reporting window](./030-content.md#reporting-windows).
