@@ -10,7 +10,6 @@ This document defines the minimal content area for the two supported application
 |   - source refresh                                                        |
 |   - dimension selection                                                   |
 |   - grouping selection                                                    |
-|   - sorting selection                                                     |
 +--------------------------------------------------------------------------+
 | [3.2] Metrics                                                            |
 |   - Overview KPIs                                                         |
@@ -34,7 +33,6 @@ The first block is dedicated to defining how data is viewed. The user can config
 
 - `3.2.1.3` dimension selection
 - `3.2.1.4` grouping criteria, including time aggregation
-- `3.2.1.5` sorting criteria
 
 This block also contains **Refresh sources**. Overview results use the [header date range](./020-header.md#22-header-elements) and the [sidebar filters](./010-navigation.md#15-filters).
 
@@ -48,7 +46,9 @@ Show total, input, and output tokens, input and output distribution, cache perce
 
 #### 3.2.2.2 Trends and charts
 
-Show token trends by hour, day, week, or month. Include project and agent trends, agent usage by project, breakdowns by model, and cached versus non-cached input. Agent trends and agent usage by project group executions by user-assigned name, then recorded name or role, then Default. The agent filter selects individual executions using readable chat and agent labels, with display-only disambiguation for duplicates. Use nicknames to identify individual executions where available. Support filtering, grouping, sorting, and CSV export.
+Show token trends by hour, day, week, or month. Include project and agent trends, agent usage by project, breakdowns by model, and cached versus non-cached input. Agent trends and agent usage by project group executions by user-assigned name, then recorded name or role, then Default. The agent filter selects individual executions using readable chat and agent labels, with display-only disambiguation for duplicates. Use nicknames to identify individual executions where available. Support filtering, grouping, and CSV export.
+
+Within each reporting window, display time buckets from oldest to newest by recorded clock time in the trend chart, the breakdown table, and the CSV. Order rows within the same bucket by project or agent name. Show usage with an unknown bucket after dated buckets when present. Whole-window breakdowns use a fixed name order, by project then agent for **Agent by project**, and by model for **Model**. The breakdown table keeps its prescribed row order.
 
 #### Saved time markers
 
@@ -81,7 +81,6 @@ The spec remains minimal until a later UI pass adds page-specific details.
 The current scope does not confirm:
 
 - the exact values for grouping dimensions such as conversation, agent, or agent role
-- whether ordering is ascending, descending, or user-defined
 - whether the configuration block is collapsible or always visible
 
 These are intentionally deferred.
