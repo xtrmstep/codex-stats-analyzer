@@ -78,8 +78,24 @@ def _row(measurement, view=None):
     }
 
 
+def _name_key(name):
+    """Order missing and present names consistently, ignoring case first."""
+    name = name or ""
+    return name.casefold(), name
+
+
+def _measurement_key(measurement, view):
+    """Return the prescribed ordering key for a breakdown measurement."""
+    if view in {"Project over time", "Agent over time"}:
+        name = measurement.project if view == "Project over time" else measurement.agent or "Default"
+        return (measurement.bucket is None, measurement.bucket or pd.Timestamp.max, *_name_key(name))
+    if view == "Agent by project":
+        return (*_name_key(measurement.project), *_name_key(measurement.agent or "Default"))
+    return _name_key(measurement.agent)
+
+
 def render_statistics(writer, calculator, selection, marker, project_keys, selected_agent,
-                      bucket, view, sort_by, sort_order, record_ids=None):
+                      bucket, view, record_ids=None):
     """Calculate and render both scopes and a selected breakdown."""
     request = StatsRequest(start_date=selection.start_date, end_date=selection.end_date,
                            bucket=bucket,
@@ -120,15 +136,8 @@ def render_statistics(writer, calculator, selection, marker, project_keys, selec
         if any(item["Tokens"] is not None for item in components):
             st.plotly_chart(px.bar(pd.DataFrame(components), x="Component", y="Tokens"),
                             use_container_width=True, key=f"components_{scope_index}")
-        rows = [_row(item, view) for item in groups[view]]
-        if sort_by == "Total tokens":
-            known = sorted((row for row in rows if row["Total tokens"] is not None),
-                           key=lambda row: row["Total tokens"], reverse=sort_order == "Descending")
-            rows = known + [row for row in rows if row["Total tokens"] is None]
-        else:
-            rows.sort(key=lambda row: tuple(str(row[field] or "").casefold()
-                                            for field in ("Project", "Agent", "Model", "Time")),
-                      reverse=sort_order == "Descending")
+        ordered = sorted(groups[view], key=lambda item: _measurement_key(item, view))
+        rows = [_row(item, view) for item in ordered]
         export_rows.extend(rows)
         if rows:
             table = pd.DataFrame(rows)
@@ -139,10 +148,21 @@ def render_statistics(writer, calculator, selection, marker, project_keys, selec
             if table["Total tokens"].notna().any():
                 chart = table.copy()
                 chart[color] = chart[color].fillna("Unknown")
-                chart[x] = chart[x].fillna("Unknown")
-                st.plotly_chart(px.bar(chart, x=x, y="Total tokens", color=color, hover_data=["Coverage"]),
+                if x == "Time" and chart[x].isna().any():
+                    chart[x] = chart[x].fillna("Unknown")
+                    figure = px.bar(chart, x=x, y="Total tokens", color=color, hover_data=["Coverage"],
+                                    category_orders={x: list(dict.fromkeys(chart[x]))})
+                    figure.update_xaxes(type="category")
+                else:
+                    if x == "Time":
+                        chart[x] = pd.to_datetime(chart[x])
+                    else:
+                        chart[x] = chart[x].fillna("Unknown")
+                    figure = px.bar(chart, x=x, y="Total tokens", color=color, hover_data=["Coverage"])
+                st.plotly_chart(figure,
                                 use_container_width=True, key=f"usage_{scope_index}")
-            st.dataframe(table, hide_index=True, use_container_width=True)
+            st.dataframe(table, hide_index=True, use_container_width=True,
+                         on_select="rerun", selection_mode="multi-column")
         else:
             st.info("No usage matches this scope.")
     columns = {name: name.lower().replace(" ", "_").replace("%", "percentage") for name in

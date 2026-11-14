@@ -57,8 +57,6 @@ def _render(sources, writer, page, start, end, range_ready):
         refresh_requested = st.button("Refresh sources")
         bucket = st.radio("Time aggregation", ["hourly", "daily", "weekly", "monthly"], index=1, horizontal=True)
         view = st.selectbox("Usage view", ["Project over time", "Agent over time", "Agent by project", "Model"])
-        sort_by = st.selectbox("Sort by", ["Group", "Total tokens"])
-        sort_order = st.radio("Sort order", ["Ascending", "Descending"], horizontal=True)
 
     with filters:
         marker = marker_selector(writer)
@@ -119,7 +117,7 @@ def _render(sources, writer, page, start, end, range_ready):
                                 (selected["agent"] == chosen["thread_id"])].copy()
     render_statistics(
         writer, report_calculator, selection, marker, project_keys, selected_agent,
-        bucket, view, sort_by, sort_order
+        bucket, view
     )
     if selected.empty:
         st.info("No observed events match the selected filters.")
