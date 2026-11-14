@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
+import json
 import sqlite3
 from uuid import uuid4
 
@@ -22,6 +23,7 @@ class TimeMarker:
     marker_id: str
     name: str
     timestamp: str
+    session_ids: frozenset[str] | None = None
 
 
 @dataclass(frozen=True)
@@ -66,12 +68,14 @@ class UsageMeasurement:
 
 def list_markers(connection: sqlite3.Connection) -> list[TimeMarker]:
     """Read saved markers in name order."""
-    return [TimeMarker(*row) for row in connection.execute(
-        "SELECT marker_id, name, timestamp FROM time_markers ORDER BY name COLLATE NOCASE, marker_id"
+    return [TimeMarker(marker_id, name, timestamp, frozenset(json.loads(sessions)) if sessions is not None else None)
+            for marker_id, name, timestamp, sessions in connection.execute(
+        "SELECT marker_id, name, timestamp, session_ids FROM time_markers ORDER BY name COLLATE NOCASE, marker_id"
     )]
 
 
-def save_marker(writer, name: str, timestamp: str, marker_id: str | None = None) -> TimeMarker:
+def save_marker(writer, name: str, timestamp: str, marker_id: str | None = None,
+                session_ids: frozenset[str] | None = None) -> TimeMarker:
     """Create or edit one marker using the generic writer transaction."""
     name = name.strip()
     if not name:
@@ -79,14 +83,16 @@ def save_marker(writer, name: str, timestamp: str, marker_id: str | None = None)
     stamp = pd.Timestamp(timestamp)
     if pd.isna(stamp) or stamp.tzinfo is None:
         raise ValueError("Marker timestamp must include a time zone.")
-    marker = TimeMarker(marker_id or str(uuid4()), name, stamp.tz_convert("UTC").isoformat())
+    if session_ids is not None and not session_ids:
+        raise ValueError("Select at least one chat.")
+    marker = TimeMarker(marker_id or str(uuid4()), name, stamp.tz_convert("UTC").isoformat(), session_ids)
     if marker_id and not writer.connection.execute(
         "SELECT 1 FROM time_markers WHERE marker_id = ?", (marker_id,)
     ).fetchone():
         raise ValueError("Marker no longer exists.")
     with writer.transaction():
-        writer.write("time_markers", {"marker_id": "marker_id", "name": "name", "timestamp": "timestamp"},
-                     [vars(marker)], ("marker_id",))
+        values = {**vars(marker), "session_ids": json.dumps(sorted(session_ids)) if session_ids is not None else None}
+        writer.write("time_markers", {key: key for key in values}, [values], ("marker_id",))
     return marker
 
 
@@ -323,9 +329,12 @@ class StatsCalculation:
             scopes.append((f"Since {request.marker.name}", cutoff, cutoff))
         result = {}
         for scope, cutoff, display_start in scopes:
+            scoped_sessions = request.marker.session_ids if request.marker and scope != "Full selected period" else None
             empty = cutoff is not None and cutoff >= effective_end
             window = []
             for original in selected:
+                if scoped_sessions is not None and original["session_id"] not in scoped_sessions:
+                    continue
                 row = original.copy()
                 observed_at = row["observed"]
                 if (cutoff is not None and (observed_at is None or observed_at < cutoff)) or (end is not None and (observed_at is None or observed_at >= end)):
@@ -353,6 +362,8 @@ class StatsCalculation:
                 observed_sessions = {row["session_id"] for row in window if row["session_id"]}
                 observed_agents = {row["execution_id"] for row in window if row["execution_id"]}
                 for session_id, execution_id, stamp in observations:
+                    if scoped_sessions is not None and session_id not in scoped_sessions:
+                        continue
                     if (cutoff is not None and (stamp is None or stamp < cutoff)) or (end is not None and (stamp is None or stamp >= end)):
                         continue
                     observed_sessions.add(session_id)
