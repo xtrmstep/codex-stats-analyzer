@@ -6,7 +6,7 @@ import sqlite3
 from uuid import uuid4
 
 import pandas as pd
-from collection import CollectedCodexRecord
+from collection import CodexLogReader
 from parser import parse_collected
 from transformations import _project
 
@@ -40,6 +40,8 @@ class StatsRequest:
     roles: frozenset[str] | None = None
     agents: frozenset[str] | None = None
     record_ids: frozenset[str] | None = None
+    resolved_start: pd.Timestamp | None = None
+    resolved_end: pd.Timestamp | None = None
 
 
 @dataclass(frozen=True)
@@ -246,6 +248,7 @@ class StatsCalculation:
 
     def __init__(self, database_path):
         self.database_path = str(database_path)
+        self.report_time = pd.Timestamp(datetime.now(timezone.utc))
         self.calculators = {
             "Project over time": ProjectUsageOverTimeCalculator(),
             "Agent over time": AgentUsageOverTimeCalculator(),
@@ -257,6 +260,9 @@ class StatsCalculation:
         connection.row_factory = sqlite3.Row
         try:
             connection.execute("BEGIN")
+            state = connection.execute("SELECT initialized FROM import_state WHERE id = 1").fetchone()
+            if not state or not state["initialized"]:
+                raise ValueError("No successful usage publication is available.")
             self.rows = [dict(row) for row in connection.execute(
                 "SELECT u.*, t.session_id, t.thread_id, t.agent_name, t.role, t.nickname, t.parent_execution_id "
                 "FROM usage_records u LEFT JOIN agent_threads t ON t.execution_id = u.execution_id"
@@ -264,14 +270,12 @@ class StatsCalculation:
             self.diagnostics = [dict(row) for row in connection.execute("SELECT * FROM coverage_diagnostics")]
             self.threads = [dict(row) for row in connection.execute("SELECT * FROM agent_threads")]
             self.parents = {row["execution_id"]: row["parent_execution_id"] for row in self.threads}
-            records = [CollectedCodexRecord(*row) for row in connection.execute(
-                "SELECT record_id, log_identity, source_path, line_number, original_line_bytes, collected_at "
-                "FROM collected_records ORDER BY log_identity, line_number"
-            )]
+            records = CodexLogReader().replay_publication(connection)
             connection.commit()
         finally:
             connection.close()
-        self.events = parse_collected(records).events
+        self.parsed = parse_collected(records)
+        self.events = self.parsed.events
 
     def calculate(self, request: StatsRequest):
         """Return summary and grouped measurements for each requested scope."""
@@ -290,15 +294,32 @@ class StatsCalculation:
             row["observed"] = _timestamp(row["observed_at"])
             row["prior"] = _timestamp(row["prior_observed_at"])
             selected.append(row)
-        observed = [row["observed"] for row in selected if row["observed"] is not None]
-        effective_start = start if start is not None else min(observed, default=None)
-        effective_end = end if end is not None else max(
-            pd.Timestamp(datetime.now(timezone.utc)), max(observed) + pd.Timedelta(nanoseconds=1) if observed else pd.Timestamp(datetime.now(timezone.utc))
-        )
+        thread_lookup = {(thread["session_id"], thread["thread_id"]): thread for thread in self.threads}
+        observations = []
+        for event in self.events:
+            thread = thread_lookup.get((event.session_id, event.thread_id))
+            if thread is None:
+                continue
+            project, _ = _project(event.project_path, event.repository_url)
+            if any(choices is not None and value not in choices for value, choices in
+                   ((project, request.projects), (event.model, request.models), (event.session_id, request.sessions),
+                    (thread["role"], request.roles), (event.thread_id, request.agents), (event.record_id, request.record_ids))):
+                continue
+            try:
+                stamp = _timestamp(event.timestamp) if event.timestamp else None
+            except (TypeError, ValueError, OverflowError):
+                stamp = None
+            observations.append((event.session_id, thread["execution_id"], stamp))
+        observed = ([row["observed"] for row in selected if row["observed"] is not None]
+                    + [stamp for _, _, stamp in observations if stamp is not None])
+        effective_start = start if start is not None else (_timestamp(request.resolved_start) or min(observed, default=None))
+        effective_end = end if end is not None else (_timestamp(request.resolved_end) or max(
+            self.report_time, max(observed) + pd.Timedelta(nanoseconds=1) if observed else self.report_time
+        ))
         scopes = [("Full selected period", start, effective_start)]
         if request.marker:
             marker = _timestamp(request.marker.timestamp)
-            cutoff = max(start, marker) if start is not None else marker
+            cutoff = max(effective_start, marker) if effective_start is not None else marker
             scopes.append((f"Since {request.marker.name}", cutoff, cutoff))
         result = {}
         for scope, cutoff, display_start in scopes:
@@ -329,26 +350,13 @@ class StatsCalculation:
             scoped_diagnostics = diagnostics + ([{"message": "Overlapping legacy agent counters withheld."}] if excluded else [])
             summary = _measure(window, scope, display_start, effective_end, diagnostics=scoped_diagnostics, empty=empty)
             if not empty:
-                thread_lookup = {(thread["session_id"], thread["thread_id"]): thread for thread in self.threads}
                 observed_sessions = {row["session_id"] for row in window if row["session_id"]}
                 observed_agents = {row["execution_id"] for row in window if row["execution_id"]}
-                for event in self.events:
-                    thread = thread_lookup.get((event.session_id, event.thread_id))
-                    if thread is None:
-                        continue
-                    project, _ = _project(event.project_path, event.repository_url)
-                    if any(choices is not None and value not in choices for value, choices in
-                           ((project, request.projects), (event.model, request.models), (event.session_id, request.sessions),
-                            (thread["role"], request.roles), (event.thread_id, request.agents), (event.record_id, request.record_ids))):
-                        continue
-                    try:
-                        stamp = _timestamp(event.timestamp) if event.timestamp else None
-                    except (TypeError, ValueError, OverflowError):
-                        stamp = None
+                for session_id, execution_id, stamp in observations:
                     if (cutoff is not None and (stamp is None or stamp < cutoff)) or (end is not None and (stamp is None or stamp >= end)):
                         continue
-                    observed_sessions.add(event.session_id)
-                    observed_agents.add(thread["execution_id"])
+                    observed_sessions.add(session_id)
+                    observed_agents.add(execution_id)
                 summary = replace(summary, sessions=len(observed_sessions), agents=len(observed_agents))
             groups = {name: calculator.groups(window, request, scope, display_start, effective_end, scoped_diagnostics)
                       for name, calculator in self.calculators.items()}

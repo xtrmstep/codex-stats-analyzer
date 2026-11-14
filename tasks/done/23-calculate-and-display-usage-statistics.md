@@ -60,3 +60,22 @@ Report usage by project and time, agent and time, and agent and project. Compare
 ### Unresolved summary
 
 Raw collection commits per source, whereas derived publication commits separately. The reporting path currently reads the latest raw collection independently of the derived generation. A failed or concurrent refresh can therefore mix generations. Persist a raw snapshot or equivalent generation-aware immutable evidence in the derived publication transaction, then verify failed-refresh, incomplete-line extension, and concurrent-read scenarios before completing the task.
+
+### Resolution
+
+Each successful publication now commits per-log line and byte boundaries with the derived data. Reports read the manifest, derived rows, diagnostics, and bounded raw evidence from one SQLite snapshot. Transactional version upgrades rebuild unmanifested data before enabling reports. Focused checks cover partial refresh failure, final-line extension, SQLite-only rebuild, concurrent readers and initialization, schema migration, and initial failure.
+
+### Follow-up verification
+
+- All-time report bounds were derived only from usage rows, omitting earlier observed activity without counters from the daily-average period.
+- The rate specification includes days with no recorded usage when coverage is complete.
+- Derive open-ended report bounds from both eligible observed events and eligible usage rows in the same publication.
+- Session-detail calculations also resolved open-ended bounds independently, allowing their displayed periods to drift from the overview. Reuse the overview's resolved bounds for those calculations.
+- When a marker precedes an open-ended period's first observation, the marker scope started before the selected period. Clip it to the resolved period start.
+- The new-marker form generated a fresh default timestamp on every rerun, causing a submitted timestamp to be replaced by the current time. Keep the initial default stable for the session and verify the saved timestamp.
+- When both reporting scopes contain identical data, Streamlit assigns duplicate chart IDs and stops rendering. Give each scope's charts distinct stable keys.
+- Marker actions trigger a Streamlit rerun before the database connection is closed, leaving SQLite handles open. Close the connection in a `finally` block on every render exit.
+
+### Follow-up resolution
+
+Open-ended bounds now include eligible observed activity and are reused for detail calculations. Marker scopes are clipped to the resolved period. The marker form keeps a stable initial timestamp, scope charts have distinct keys, and dashboard database connections close on rerun. Focused Streamlit checks verified the entered and edited marker timestamps, identical scope charts, failed-refresh fallback, and connection cleanup.

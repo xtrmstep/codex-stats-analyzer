@@ -3,6 +3,7 @@
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
+import hashlib
 from pathlib import Path
 import re
 import sqlite3
@@ -49,11 +50,11 @@ class DatabaseWriter:
         self._initialize_schema()
 
     def _initialize_schema(self) -> None:
-        version = self.connection.execute("PRAGMA user_version").fetchone()[0]
-        if version > 4:
-            raise ValueError(f"Unsupported database schema version: {version}")
-        if version == 0:
-            with self.connection:
+        with self.transaction():
+            version = self.connection.execute("PRAGMA user_version").fetchone()[0]
+            if version > 5:
+                raise ValueError(f"Unsupported database schema version: {version}")
+            if version == 0:
                 self.connection.execute("CREATE TABLE IF NOT EXISTS logs (log_identity TEXT PRIMARY KEY)")
                 self.connection.execute(
                     "CREATE TABLE IF NOT EXISTS source_paths ("
@@ -67,9 +68,8 @@ class DatabaseWriter:
                     "UNIQUE(log_identity, line_number))"
                 )
                 self.connection.execute("PRAGMA user_version = 1")
-            version = 1
-        if version == 1:
-            with self.connection:
+                version = 1
+            if version == 1:
                 self.connection.execute(
                     "CREATE TABLE IF NOT EXISTS agent_threads ("
                     "execution_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, thread_id TEXT NOT NULL, "
@@ -89,9 +89,8 @@ class DatabaseWriter:
                     "source_record_id TEXT, execution_id TEXT, observed_at TEXT, message TEXT NOT NULL)"
                 )
                 self.connection.execute("PRAGMA user_version = 2")
-            version = 2
-        if version == 2:
-            with self.connection:
+                version = 2
+            if version == 2:
                 self.connection.execute(
                     "CREATE TABLE IF NOT EXISTS time_markers ("
                     "marker_id TEXT PRIMARY KEY, name TEXT NOT NULL, timestamp TEXT NOT NULL)"
@@ -101,11 +100,27 @@ class DatabaseWriter:
                     "initialized INTEGER NOT NULL)"
                 )
                 self.connection.execute("PRAGMA user_version = 3")
-            version = 3
-        if version == 3:
-            with self.transaction():
+                version = 3
+            if version == 3:
                 self.connection.execute("ALTER TABLE coverage_diagnostics ADD COLUMN kind TEXT NOT NULL DEFAULT 'usage'")
                 self.connection.execute("PRAGMA user_version = 4")
+                version = 4
+            if version == 4:
+                self.connection.execute(
+                    "CREATE TABLE published_logs (log_identity TEXT PRIMARY KEY REFERENCES logs(log_identity), "
+                    "last_line INTEGER NOT NULL, last_length INTEGER NOT NULL, last_digest TEXT NOT NULL)"
+                )
+                self.connection.execute("ALTER TABLE import_state ADD COLUMN needs_rebuild INTEGER NOT NULL DEFAULT 0")
+                self.connection.execute("UPDATE import_state SET initialized = 0, needs_rebuild = 1 WHERE initialized = 1")
+                prior_rows = self.connection.execute(
+                    "SELECT EXISTS(SELECT 1 FROM usage_records) OR EXISTS(SELECT 1 FROM agent_threads)"
+                ).fetchone()[0]
+                if prior_rows:
+                    self.connection.execute(
+                        "INSERT INTO import_state (id, initialized, needs_rebuild) VALUES (1, 0, 1) "
+                        "ON CONFLICT(id) DO NOTHING"
+                    )
+                self.connection.execute("PRAGMA user_version = 5")
 
     @contextmanager
     def transaction(self):
@@ -166,6 +181,32 @@ class CodexLogReader:
             "FROM collected_records ORDER BY log_identity, line_number"
         ).fetchall()
         return [CollectedCodexRecord(*row) for row in rows]
+
+    def replay_publication(self, connection: sqlite3.Connection) -> list[CollectedCodexRecord]:
+        """Read exactly the raw evidence included in the current publication.
+
+        The caller must hold a read transaction while loading the manifest and
+        derived rows so every part of the report sees the same publication.
+        """
+        manifests = connection.execute(
+            "SELECT log_identity, last_line, last_length, last_digest FROM published_logs ORDER BY log_identity"
+        ).fetchall()
+        records = []
+        for log_id, last_line, last_length, digest in manifests:
+            rows = connection.execute(
+                "SELECT record_id, log_identity, source_path, line_number, original_line_bytes, collected_at "
+                "FROM collected_records WHERE log_identity = ? AND line_number <= ? ORDER BY line_number",
+                (log_id, last_line),
+            ).fetchall()
+            if len(rows) != last_line or any(row[3] != index for index, row in enumerate(rows, 1)):
+                raise ValueError(f"Published source {log_id} has missing lines.")
+            final = rows[-1]
+            prefix = final[4][:last_length]
+            if len(prefix) != last_length or hashlib.sha256(prefix).hexdigest() != digest:
+                raise ValueError(f"Published source {log_id} no longer has its recorded byte prefix.")
+            records.extend(CollectedCodexRecord(*row) for row in rows[:-1])
+            records.append(CollectedCodexRecord(*final[:4], prefix, final[5]))
+        return records
 
 
 def _archive_key(path: str) -> tuple[str, str, str] | None:
@@ -314,8 +355,16 @@ class CodexLogImporter:
                     self.writer.write(table, mapping, rows)
                 columns = ("source_record_id", "execution_id", "observed_at", "message", "kind")
                 self.writer.write("coverage_diagnostics", {column: column for column in columns}, coverage)
-                self.writer.write("import_state", {"id": "id", "initialized": "initialized"},
-                                  [{"id": 1, "initialized": 1}], ("id",))
+                last_records = {record.log_identity: record for record in records}
+                manifests = [{"log_identity": record.log_identity, "last_line": record.line_number,
+                              "last_length": len(record.original_line_bytes),
+                              "last_digest": hashlib.sha256(record.original_line_bytes).hexdigest()}
+                             for record in last_records.values()]
+                connection.execute("DELETE FROM published_logs")
+                manifest_columns = ("log_identity", "last_line", "last_length", "last_digest")
+                self.writer.write("published_logs", {column: column for column in manifest_columns}, manifests)
+                self.writer.write("import_state", {"id": "id", "initialized": "initialized", "needs_rebuild": "needs_rebuild"},
+                                  [{"id": 1, "initialized": 1, "needs_rebuild": 0}], ("id",))
             return True, []
         except Exception as exc:
             return False, [Diagnostic(str(self.writer.database_path), None, f"Cannot rebuild usage: {exc}", fatal=True)]

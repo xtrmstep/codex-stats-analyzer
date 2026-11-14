@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from dataclasses import replace
+import sqlite3
 
 import pandas as pd
 import plotly.express as px
@@ -10,9 +11,9 @@ import streamlit as st
 from agents import analyze_agents
 from analytics import Total, calculate_increments
 from metrics import Filters, build_dataset, filter_dataset
-from parser import parse_collected
 from collection import CodexLogImporter, CodexLogReader, DatabaseWriter
 from statistics_ui import display_timezone, marker_controls, render_statistics
+from usage_statistics import StatsCalculation
 from annotations import MetadataStore, StorageError, missing_sessions
 from labels_ui import manage
 from labels import assigned, matches, run_labels
@@ -37,22 +38,45 @@ def _options(frame, column, label):
 
 def render(sources):
     """Render the overview and selected session from local read-only sources."""
+    try:
+        writer = DatabaseWriter()
+    except (OSError, sqlite3.Error, ValueError) as exc:
+        st.error(f"Usage database is unavailable: {exc}")
+        return
+    try:
+        _render(sources, writer)
+    finally:
+        writer.close()
+
+
+def _render(sources, writer):
     refresh_requested = st.sidebar.button("Refresh sources")
-    writer = DatabaseWriter()
     reader = CodexLogReader()
     importer = CodexLogImporter(reader, writer)
-    initialized = writer.connection.execute("SELECT initialized FROM import_state WHERE id = 1").fetchone()
+    state = writer.connection.execute("SELECT initialized, needs_rebuild FROM import_state WHERE id = 1").fetchone()
+    initialized = bool(state and state[0])
+    needs_rebuild = bool(state and state[1])
     first_attempt = not initialized and not st.session_state.get("initial_import_attempted", False)
     if first_attempt or refresh_requested:
         st.session_state["initial_import_attempted"] = True
-        successful, diagnostics = importer.refresh(sources)
+        successful, diagnostics = (importer.rebuild() if first_attempt and needs_rebuild and not refresh_requested
+                                   else importer.refresh(sources))
         st.session_state["source_diagnostics"] = [(item.source, item.message, item.fatal) for item in diagnostics]
         st.session_state["source_refresh_failed"] = not successful
     for source, message, fatal in st.session_state.get("source_diagnostics", []):
         (st.error if fatal else st.warning)(f"{source}: {message}")
+    state = writer.connection.execute("SELECT initialized FROM import_state WHERE id = 1").fetchone()
+    if not state or not state[0]:
+        st.warning("No published usage dataset is available. Use Refresh sources to retry.")
+        return
     if st.session_state.get("source_refresh_failed", False):
         st.warning("Showing the last committed usage dataset.")
-    parsed = parse_collected(reader.replay(writer.connection))
+    try:
+        report_calculator = StatsCalculation(writer.database_path)
+    except (ValueError, OSError, sqlite3.Error) as exc:
+        st.error(f"Published usage is unavailable: {exc}")
+        return
+    parsed = report_calculator.parsed
     accounting = calculate_increments(parsed.events)
     frame = build_dataset(parsed.events, accounting.increments)
     store = MetadataStore(Path(__file__).resolve().parent / "data" / "annotations.json", "annotations")
@@ -99,9 +123,8 @@ def render(sources):
         mode_values = sorted(set(mode_values) | {run["execution_mode"] for run in snapshot.data["runs"] if run.get("execution_mode")})
     task_types = st.sidebar.multiselect("Manual task type", task_values)
     execution_modes = st.sidebar.multiselect("Manual execution mode", mode_values)
-    projects = writer.connection.execute(
-        "SELECT DISTINCT project_key, source_working_directory FROM usage_records WHERE project_key IS NOT NULL"
-    ).fetchall()
+    projects = {(row["project_key"], row["source_working_directory"]) for row in report_calculator.rows
+                if row["project_key"] is not None}
     selected_projects = st.sidebar.multiselect("Projects", sorted({row[0] for row in projects}))
     project_keys = frozenset(selected_projects) if selected_projects else None
     source_projects = frozenset(row[1] for row in projects if row[0] in selected_projects and row[1])
@@ -142,8 +165,9 @@ def render(sources):
         references = set(selected["reference"])
         selected_record_ids = frozenset(event.record_id for event in parsed.events
                                         if event.reference in references and event.record_id)
-    report_request, report_calculator, report_result = render_statistics(writer, selection, zone, marker, project_keys,
-                                                                        selected_agent, selected_record_ids)
+    report_request, report_calculator, report_result = render_statistics(
+        writer, report_calculator, selection, zone, marker, project_keys, selected_agent, selected_record_ids
+    )
     run_rows, run_mean, run_median = run_summary(run_matches, parsed.events, snapshot.data if snapshot else None)
     run_columns = st.columns(3)
     run_columns[0].metric("Runs", len(run_rows))
@@ -191,7 +215,6 @@ def render(sources):
             st.write(f"{item.source}:{item.line or '-'} — {item.message}")
         for item in accounting.diagnostics:
             st.write(item)
-    writer.close()
 
 
 def details(root, selected, events, increments, date_filter_active=False, calculator=None, report_request=None):
