@@ -1,6 +1,6 @@
 """Streamlit dashboard using the shared analytics contract."""
 
-from datetime import date
+from datetime import date, timedelta
 import sqlite3
 
 import streamlit as st
@@ -32,30 +32,36 @@ def _unrestricted_label(label, options):
     return candidate
 
 
+def _date_limits(preset, today):
+    """Resolve an Overview preset to inclusive local calendar dates."""
+    monday = today - timedelta(days=today.weekday())
+    month_start = today.replace(day=1)
+    previous_month_end = month_start - timedelta(days=1)
+    return {
+        "Today": (today, today),
+        "All Time": (None, None),
+        "Current week": (monday, today),
+        "Last week": (monday - timedelta(days=7), monday - timedelta(days=1)),
+        "Current month": (month_start, today),
+        "Last month": (previous_month_end.replace(day=1), previous_month_end),
+    }[preset]
+
+
 def render(sources):
     """Render the overview and selected session from local read-only sources."""
     page = st.sidebar.radio("Navigation", ["Overview", "Manual annotations"])
-    date_mode = st.selectbox("Date range", ["All Time", "Custom range"])
-    start = end = None
-    range_ready = True
-    if date_mode == "Custom range":
-        bounds = st.date_input("Selected dates", (date.today(), date.today()))
-        if len(bounds) == 2:
-            start, end = bounds
-        else:
-            range_ready = False
     try:
         writer = DatabaseWriter()
     except (OSError, sqlite3.Error, ValueError) as exc:
         st.error(f"Usage database is unavailable: {exc}")
         return
     try:
-        _render(sources, writer, page, start, end, range_ready)
+        _render(sources, writer, page)
     finally:
         writer.close()
 
 
-def _render(sources, writer, page, start, end, range_ready):
+def _render(sources, writer, page):
     if page == "Manual annotations":
         marker_editor(writer)
         agent_name_editor(writer)
@@ -67,6 +73,9 @@ def _render(sources, writer, page, start, end, range_ready):
     configuration = st.container()
     with configuration:
         st.subheader("Overview configuration")
+        preset = st.selectbox("Date range", ["Today", "All Time", "Current week", "Last week",
+                                             "Current month", "Last month"])
+        start, end = _date_limits(preset, date.today())
         refresh_requested = st.button("Refresh sources")
         bucket = st.radio("Time aggregation", ["hourly", "daily", "weekly", "monthly"], index=1, horizontal=True)
         view = st.selectbox("Usage view", ["Project over time", "Agent over time", "Agent by project", "Model"])
@@ -113,7 +122,7 @@ def _render(sources, writer, page, start, end, range_ready):
                             projects=source_projects if project_keys is not None else None,
                             models=_options(frame, "model", "Models"),
                             agent_roles=_options(frame, "agent_role", "Agent roles"))
-        selected = filter_dataset(frame, selection) if range_ready else frame.iloc[0:0].copy()
+        selected = filter_dataset(frame, selection)
         available_pairs = set(zip(selected["session"], selected["agent"]))
         available_threads = [row for row in report_calculator.threads
                              if (row["session_id"], row["thread_id"]) in available_pairs]
@@ -138,9 +147,6 @@ def _render(sources, writer, page, start, end, range_ready):
         selected_agents = (frozenset(row["execution_id"] for row in chosen_threads)
                            if selected_chat is not None or selected_agent is not None else None)
 
-    if not range_ready:
-        st.info("Select both dates for the reporting range.")
-        return
     if selected_agents is not None:
         chosen_pairs = {(row["session_id"], row["thread_id"]) for row in chosen_threads}
         selected = selected.loc[[pair in chosen_pairs for pair in zip(selected["session"], selected["agent"])]].copy()
