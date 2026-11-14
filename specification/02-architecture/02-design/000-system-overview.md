@@ -30,3 +30,9 @@ Commit each source's new or extended records in one transaction. A read or write
 4. Publish all registered outputs, including derived usage, threads, and associated coverage diagnostics, in one transaction. A failed transformation or database write leaves the last committed usage dataset available. Successfully collected records remain available for a retry. Retain collected records, saved time markers, and existing annotations across rebuilds and schema upgrades. Rebuilding the same records with the same rules produces the same results.
 
 Cross-thread totals include only independently attributable usage. If some usage is missing or its scope may overlap, report the known independent amount as partial when it can be stated reliably, or report unknown. Apply the same rule to charts, tables, and CSV exports.
+
+Keep counter provenance and coverage to identify potential overlap. Legacy deltas retain the prior observation time when known. Input, output, cached input, cache-write input, reasoning output, and total token counts are nullable.
+
+Match model and project context by thread and turn IDs when available. Keep the source working directory. Attribute project by the turn's working directory, falling back to the thread's directory. Group by normalized repository identity when known, otherwise by normalized directory. Show missing project, model, or agent attribution as unknown.
+
+Group threads by session when supported by the source. Use agent name or role to group executions across chats and a nickname when available to identify an execution in the UI.

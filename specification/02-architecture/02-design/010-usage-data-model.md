@@ -6,12 +6,12 @@ SQLite stores the first four classes. Requests and measurements live in memory f
 
 | Class | Description |
 | --- | --- |
-| <a name="collectedcodexrecord"></a>`CollectedCodexRecord` | Preserves one JSONL line byte for byte, including any terminator. Log identity survives verified appends and archive moves. See [raw collection](./000-system-overview.md#raw-collection). |
-| <a name="codexagentthread"></a>`CodexAgentThread` | Identifies an execution with separate session and native thread IDs and an optional verified parent. Group by session when the source supports it, or by name or role across chats. A nickname can identify an execution in the UI. |
-| <a name="codexusage"></a>`CodexUsage` | Records a response or legacy counter delta, with provenance and coverage for potential overlap. Legacy deltas retain the prior observation time when known. Input, output, cached input, cache-write input, reasoning output, and total counts are nullable. Each row keeps the source directory. Match context by thread and turn IDs when available and take the model from matched context. Attribute project by turn directory, falling back to thread directory. Group by normalized repository identity when known, otherwise by normalized directory. Show missing project, model, or agent attribution as unknown. |
-| <a name="timemarker"></a>`TimeMarker` | Stores a user-named timestamp across rebuilds and schema upgrades. See [saved time markers](../../codex-usage-analyzer.md#54-saved-time-markers). |
-| <a name="statsrequest"></a>`StatsRequest` | Carries report settings, including grouping by execution, name, or role. Calculators share the same filters and resolved [reporting windows](../../codex-usage-analyzer.md#63-visualizations). See [StatsCalculation](./020-backend-class-design.md#statscalculation). |
-| <a name="usagemeasurement"></a>`UsageMeasurement` | Reports an on-demand summary or group from committed rows for the full period or since the marker. Values carry complete, partial, or unknown coverage. Empty windows are explicit and unknown amounts stay distinct from zero. |
+| <a name="collectedcodexrecord"></a>`CollectedCodexRecord` | Preserves one JSONL line byte for byte, including any terminator. |
+| <a name="codexagentthread"></a>`CodexAgentThread` | Identifies an execution by separate session and thread IDs, with an optional verified parent. |
+| <a name="codexusage"></a>`CodexUsage` | Records token counts for a response or legacy counter delta. |
+| <a name="timemarker"></a>`TimeMarker` | Stores a named timestamp across rebuilds and schema upgrades. |
+| <a name="statsrequest"></a>`StatsRequest` | Carries report filters, time range, and grouping settings. |
+| <a name="usagemeasurement"></a>`UsageMeasurement` | Summarizes usage and coverage for a reporting window or a group within it. |
 
 ## Class schema
 

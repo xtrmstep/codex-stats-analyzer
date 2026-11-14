@@ -39,7 +39,7 @@ classDiagram
 
 ### StatsCalculation
 
-Receive a [`StatsRequest`](./010-usage-data-model.md#statsrequest) and the calculators for the requested report. Resolve the reporting windows once and give each calculator the same filters, effective windows, and read snapshot. Assemble the returned [`UsageMeasurement`](./010-usage-data-model.md#usagemeasurement) objects. A report uses one committed SQLite snapshot even if an import finishes during the calculation.
+Receive a [`StatsRequest`](./010-usage-data-model.md#statsrequest) and the calculators for the requested report. Resolve the [reporting windows](../../codex-usage-analyzer.md#63-visualizations) once and give each calculator the same filters, effective windows, and read snapshot. Assemble the returned [`UsageMeasurement`](./010-usage-data-model.md#usagemeasurement) objects. A report uses one committed SQLite snapshot even if an import finishes during the calculation.
 
 ### UsageCalculator
 
@@ -52,6 +52,8 @@ Each calculator reads the committed records it needs through the report's read c
 | `AgentUsageByProjectCalculator` | Read `CodexUsage` and `CodexAgentThread` and group by agent and project. |
 
 Calculators return reporting-window summaries and grouped measurements for the requested view. Calculate summaries directly from eligible rows so percentages and overlap handling are consistent across groupings. A time-bucket measurement uses the intersection of that bucket and the reporting window as its effective bounds.
+
+Measurements carry complete, partial, or unknown coverage. Mark empty windows explicitly and keep unknown amounts distinct from zero.
 
 ## Existing code
 
