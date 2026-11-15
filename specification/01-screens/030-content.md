@@ -31,7 +31,7 @@ The second block displays summary metrics and trend visualizations.
 
 #### 3.2.2.1 Overview KPIs
 
-Show a compact, read-only KPI table above the charts for each reporting window with results. Use **Name**, **Value**, and **Description** as the three column headers, in that order. Display the formulas below in the listed row order, using **Unknown** for unavailable values. Show the agent count and coverage alongside the table. Distinguish observed facts, manual annotations, and estimates. Use the [token accounting and rate rules](../02-architecture/02-design/020-backend-class-design.md#token-accounting).
+Show a compact, read-only KPI table above the charts for each reporting window with results. Use **Name**, **Value**, and **Description** as the three column headers, in that order. Use tight cell spacing, right-align values, and let formula descriptions wrap on narrow screens. Display the formulas below in the listed row order, using **Unknown** for unavailable values. Show the agent count and coverage alongside the table. Distinguish observed facts, manual annotations, and estimates. Use the [token accounting and rate rules](../02-architecture/02-design/020-backend-class-design.md#token-accounting).
 
 | Name | Description |
 | --- | --- |
@@ -46,6 +46,8 @@ Show a compact, read-only KPI table above the charts for each reporting window w
 #### 3.2.2.2 Trends and charts
 
 Below the KPIs for each reporting window, show seven charts in these two sections, in order.
+
+Show the charts in a single column with compact heights, margins, and title spacing. Give charts more room when needed for readable axis labels, legends, or project facet labels.
 
 | Section | Chart | Grouping |
 | --- | --- | --- |
