@@ -149,12 +149,16 @@ def _measurement_key(measurement, view):
     return _name_key(measurement.agent)
 
 
-def _comparison_result(calculator, request, bounds, agents):
-    """Calculate the preceding period without applying the saved marker."""
-    if bounds is None:
+def _comparison_result(calculator, request, bounds, agents, marker=None):
+    """Calculate a previous-period or saved-marker comparison."""
+    if bounds is None and marker is None:
         return None
-    comparison_request = replace(request, start_date=bounds[0], end_date=bounds[1],
-                                 agents=agents, marker=None)
+    if bounds is not None:
+        comparison_request = replace(request, start_date=bounds[0], end_date=bounds[1],
+                                     agents=agents, marker=None)
+    else:
+        comparison_request = replace(request, start=pd.Timestamp(marker.timestamp), start_date=None,
+                                     agents=agents, marker=None)
     summary, groups = calculator.calculate(comparison_request)["Full selected period"]
     return bounds, summary, groups
 
@@ -197,24 +201,15 @@ def render_statistics(calculator, selection, marker, project_keys, selected_agen
     """Calculate and render each scope's seven usage breakdowns."""
     request = StatsRequest(start_date=selection.start_date, end_date=selection.end_date,
                            bucket=bucket,
-                           marker=marker, projects=project_keys, models=selection.models,
+                           marker=None, projects=project_keys, models=selection.models,
                            roles=selection.agent_roles,
                            agents=selected_agents)
     result = calculator.calculate(request)
-    comparison = _comparison_result(calculator, request, comparison_bounds, comparison_agents)
+    comparison = _comparison_result(calculator, request, comparison_bounds, comparison_agents, marker)
     for scope_index, (scope, (summary, groups)) in enumerate(result.items()):
-        if scope != "Full selected period":
-            st.subheader(scope)
-            if marker:
-                st.caption(f"Marker: {marker.timestamp}")
         if summary.empty_window:
             st.info("No time in range")
             continue
-        if scope != "Full selected period":
-            start_label = summary.start.isoformat() if summary.start is not None else "Unknown"
-            end_label = summary.end.isoformat() if summary.end is not None else "Unknown"
-            date_label = f"Recorded dates: {selection.start_date or 'unbounded'} to {selection.end_date or 'unbounded'} (inclusive). " if selection.start_date or selection.end_date else ""
-            st.caption(f"{date_label}Effective instants: {start_label} to {end_label}. Coverage: {summary.coverage}.")
         kpis = [
             ("Total tokens",
              "Total tokens used for model input and output. `Input tokens + Output tokens`"),
@@ -252,7 +247,9 @@ def render_statistics(calculator, selection, marker, project_keys, selected_agen
                 </style>
             """, unsafe_allow_html=True)
             if previous_values is not None:
-                header = "| Name | Value | Previous period | Description |\n| --- | --- | --- | --- |\n"
+                label = ("Since " + "".join(f"&#{ord(char)};" for char in marker.name)
+                         if marker and comparison_bounds is None else "Previous period")
+                header = f"| Name | Value | {label} | Description |\n| --- | --- | --- | --- |\n"
                 rows = (f"| {name} | {value} | {previous} | {description} |"
                         for (name, description), value, previous in zip(kpis, values, previous_values))
             else:
@@ -275,10 +272,15 @@ def render_statistics(calculator, selection, marker, project_keys, selected_agen
             left, right = st.columns(2)
             with left:
                 st.markdown("**Selected period**")
-                st.caption(f"{selection.start_date} to {selection.end_date} (inclusive)")
+                st.caption(f"{selection.start_date or 'unbounded'} to {selection.end_date or 'unbounded'} (inclusive)")
             with right:
-                st.markdown("**Previous period**")
-                st.caption(f"{comparison[0][0]} to {comparison[0][1]} (inclusive)")
+                if marker and comparison_bounds is None:
+                    st.text(f"Since {marker.name}")
+                    end = selection.end_date or (comparison[1].end.isoformat() if comparison[1].end is not None else "Unknown")
+                    st.caption(f"{marker.timestamp} to {end}")
+                else:
+                    st.markdown("**Previous period**")
+                    st.caption(f"{comparison[0][0]} to {comparison[0][1]} (inclusive)")
         for section, charts in sections:
             st.subheader(section)
             for title, group_key, series in charts:
@@ -289,6 +291,9 @@ def render_statistics(calculator, selection, marker, project_keys, selected_agen
                     with left:
                         _render_chart(groups, title, group_key, series, scope_index, "selected")
                     with right:
-                        _render_chart(comparison[2], title, group_key, series, scope_index, "previous")
+                        if comparison[1].empty_window:
+                            st.info("No time in range")
+                        else:
+                            _render_chart(comparison[2], title, group_key, series, scope_index, "previous")
                 else:
                     _render_chart(groups, title, group_key, series, scope_index, "selected")
