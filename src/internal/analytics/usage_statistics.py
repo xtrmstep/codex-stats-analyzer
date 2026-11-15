@@ -228,11 +228,11 @@ class AgentUsageOverTimeCalculator(UsageCalculator):
         return None, reporting_agent_name(row), _bucket(row["observed"], request)
 
 
-class AgentUsageByProjectOverTimeCalculator(UsageCalculator):
-    """Group usage by project, agent, and time."""
+class AgentUsageByProjectCalculator(UsageCalculator):
+    """Group whole-window usage by project and agent."""
 
     def key(self, row, request):
-        return row["project_key"], reporting_agent_name(row), _bucket(row["observed"], request)
+        return row["project_key"], reporting_agent_name(row), None
 
 
 class ModelUsageOverTimeCalculator(UsageCalculator):
@@ -272,7 +272,7 @@ class StatsCalculation:
         self.calculators = {
             "Project over time": ProjectUsageOverTimeCalculator(),
             "Agent over time": AgentUsageOverTimeCalculator(),
-            "Agent by project over time": AgentUsageByProjectOverTimeCalculator(),
+            "Agent by project": AgentUsageByProjectCalculator(),
             "Model over time": ModelUsageOverTimeCalculator(),
             "By project": ProjectUsageCalculator(),
             "By agent": AgentUsageCalculator(),
