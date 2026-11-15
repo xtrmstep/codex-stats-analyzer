@@ -80,7 +80,7 @@ All seven charts use the same filtered usage and display total tokens. The trend
 
 Group agent charts by reporting name. Use the user-assigned name if present, otherwise the recorded name, then the recorded role, then **Default**. The [sidebar Agent filter](./010-navigation.md#15-filters) uses the same reporting name.
 
-Use an empty state for a chart without plottable totals and retain the reporting window's empty-range state. The **Download usage CSV** action includes the scope summary and all seven breakdowns for each reporting window. Within each trend breakdown, order rows by time bucket and then group names. Within each summary breakdown, order rows by group name.
+Use an empty state for a chart without plottable totals and retain the reporting window's empty-range state. Within each trend breakdown, order data by time bucket and then group name. Order summary categories by group name.
 
 #### Saved time markers
 

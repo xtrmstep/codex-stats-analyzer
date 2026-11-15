@@ -44,7 +44,7 @@ classDiagram
     UsageCalculator <|.. ModelUsageOverTimeCalculator
 ```
 
-Dashboard and export use the same measurements. Calculate window and per-dimension summaries directly from eligible rows and clip time buckets to the reporting window. See [reporting windows](../../01-screens/030-content.md#reporting-windows).
+Calculate window and per-dimension summaries directly from eligible rows and clip time buckets to the reporting window. See [reporting windows](../../01-screens/030-content.md#reporting-windows).
 
 ## Agent analysis
 
