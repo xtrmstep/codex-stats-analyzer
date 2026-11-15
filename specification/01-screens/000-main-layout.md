@@ -11,14 +11,15 @@ The application is organized into three primary regions:
 - `0.3` main content region
 
 ```text
-+----------------------------------------------------------------------------------+
-| [0.2] Header                                                                       |
-|   - system title                                                                   |
-+-------------------------+----------------------------------------------------------+
-| [0.1] Sidebar            | [0.3] Main content                                       |
-|   - Navigation           |   - overview date range, report controls, KPIs, and charts |
-|   - Filters (Overview)   |   - manual event editor                                   |
-+-------------------------+----------------------------------------------------------+
++--------------------------------------------------------------------------------------+
+| [0.2] Header                                                                         |
+|   - system title                                                                     |
++------------------------------+-------------------------------------------------------+
+| [0.1] Sidebar                | [0.3] Main content                                    |
+|   - Navigation               |   - refresh actions, KPIs, and charts                 |
+|   - Overview configuration   |   - manual annotations editor                         |
+|   - Filters (collapsible)    |                                                       |
++------------------------------+-------------------------------------------------------+
 ```
 
 The page shell is a conceptual reference for the simplified UI. Detailed behavior for each region is defined in the related documents:
@@ -31,7 +32,7 @@ The page shell is a conceptual reference for the simplified UI. Detailed behavio
 
 ### 0.2.1 Sidebar region
 
-The left sidebar contains persistent **Navigation** and a **Filters** section for Overview. See the [sidebar specification](./010-navigation.md).
+The left sidebar contains persistent **Navigation**. On Overview, it also contains **Overview configuration** and collapsible **Filters**. See the [sidebar specification](./010-navigation.md).
 
 ### 0.2.2 Header region
 

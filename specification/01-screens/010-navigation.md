@@ -1,6 +1,6 @@
 # Sidebar
 
-The sidebar provides navigation between Overview and Manual annotations and contains the filters for Overview.
+The sidebar provides navigation between Overview and Manual annotations and contains Overview configuration and filters.
 
 ## 1.1 Sidebar sketch
 
@@ -11,7 +11,9 @@ The sidebar provides navigation between Overview and Manual annotations and cont
 |  1.1.1 Overview                                              |
 |  1.1.2 Manual annotations                                    |
 |                                                               |
-| Filters (Overview)                                            |
+| Overview configuration                                       |
+|   Date range and Time aggregation                            |
+| Filters (collapsible)                                         |
 |                                                               |
 +---------------------------------------------------------------+
 ```
@@ -50,9 +52,26 @@ These remain open for later UI specification work.
 
 ## 1.5 Filters
 
-Show **Filters** below **Navigation** when Overview is selected. It contains project, model, observed agent role, chat, agent name, execution mode, and saved time marker selection. The [date range](./030-content.md#date-range) is in the Overview configuration. Manual annotations uses its own editor controls in the main content area.
+On Overview, show one collapsible **Filters** section below [Overview configuration](#16-overview-configuration). Start it expanded. Collapsing it hides the controls and keeps their selections active. It contains project, model, observed agent role, chat, agent name, execution mode, and saved time marker selection. Manual annotations uses its own editor controls in the main content area.
 
 - **Chat** lists distinct known titles available for the selected dates and other applicable filters. It defaults to **All chats** and returns to that value if the selected title becomes unavailable. A selected title includes the main agent and all subagents that have inherited that title from their verified root. If several chats share the same title, the option includes all of them. Usage from untitled chats remains available under **All chats**.
 - **Agent** lists distinct agent and subagent names and defaults to **All agents**. Use the [reporting name](./030-content.md#3222-trends-and-charts) for each execution. With **All chats**, a selected name matches executions across chats. A selected chat title narrows the available agent names and the results. Keep a selected agent name while it remains available and reset to **All agents** when it becomes unavailable. **Agent roles** filters by observed role and combines with both selections.
 
 The filters determine which records contribute to Overview results. The saved time marker adds the [second reporting window](./030-content.md#reporting-windows).
+
+## 1.6 Overview configuration
+
+On Overview, show **Overview configuration** below **Navigation** and above **Filters**. It contains **Date range** and **Time aggregation**. Time aggregation offers hourly, daily, weekly, and monthly buckets.
+
+### Date range
+
+Resolve the presets against the app's local date each time Overview renders. In the option list and the selected value, show each bounded preset's name followed by its inclusive dates in `YYYY-MM-DD` format. **Today** shows one date, and **All Time** shows its name alone. Reports use the same bounds shown in the selector.
+
+| Preset | Date limits |
+| --- | --- |
+| **Today** (default) | Today's date |
+| **All Time** | Unbounded |
+| **Current week** | This week's Monday through today |
+| **Last week** | Last week's Monday through Sunday |
+| **Current month** | This month's first day through today |
+| **Last month** | Last month's first through last day |

@@ -7,9 +7,6 @@ This document defines the minimal content area for the two supported application
 ```text
 +--------------------------------------------------------------------------+
 |   [Incremental refresh]  [Full refresh from source]                       |
-| [3.1] Overview configuration                                             |
-|   - date range                                                            |
-|   - time aggregation                                                      |
 +--------------------------------------------------------------------------+
 | [3.2] Metrics                                                            |
 |   - Overview KPIs                                                         |
@@ -25,24 +22,11 @@ This conceptual layout corresponds to the main content region in [000-main-layou
 
 ## 3.2 Content responsibilities
 
-### 3.2.1 View Parameters / View Configuration
+### 3.2.1 Refresh actions
 
-Show **Incremental refresh** and **Full refresh from source** side by side in a single row immediately above the **Overview configuration** heading. Under the heading, show **Date range** and **Time aggregation**. Time aggregation offers hourly, daily, weekly, and monthly buckets. Overview results use the date range and the [sidebar filters](./010-navigation.md#15-filters).
+Show **Incremental refresh** and **Full refresh from source** side by side in a single row at the top of the Overview main content. Results use the [sidebar configuration](./010-navigation.md#16-overview-configuration) and [filters](./010-navigation.md#15-filters).
 
 **Incremental refresh** loads new records and retains imported history. **Full refresh from source** replaces the imported dataset with the source records currently available. Explain beside the full refresh action that previously imported history can disappear and that saved markers and agent names are kept. See [source collection](../02-architecture/02-design/000-system-overview.md#component-behavior).
-
-#### Date range
-
-Show a **Date range** selector in Overview configuration. Resolve the presets against the app's local date each time Overview renders. In the option list and the selected value, show each bounded preset's name followed by its inclusive dates in `YYYY-MM-DD` format. **Today** shows one date, and **All Time** shows its name alone. Reports use the same bounds shown in the selector.
-
-| Preset | Date limits |
-| --- | --- |
-| **Today** (default) | Today's date |
-| **All Time** | Unbounded |
-| **Current week** | This week's Monday through today |
-| **Last week** | Last week's Monday through Sunday |
-| **Current month** | This month's first day through today |
-| **Last month** | Last month's first through last day |
 
 ### 3.2.2 Metrics
 
@@ -90,7 +74,7 @@ Users can create, rename, edit, and delete named timestamps. Markers have no cha
 
 Filter by inclusive recorded calendar date, group using recorded clock labels (with weeks starting Monday), and display recorded timestamps and offsets. Compare marker instants using their offsets. When mixed offsets do not establish a single elapsed duration, leave the corresponding rate unknown.
 
-Show **Full selected period** and, when a marker is selected, **Since [marker name]** together. The latter is the intersection of the selected range and the time starting at the marker, inclusive. Apply the same filters across chats to both. The marker adds only the inclusive cutoff. Show the marker timestamp and effective bounds, and display **No time in range** for an empty intersection. Use the [token accounting rules](../02-architecture/02-design/020-backend-class-design.md#token-accounting) for coverage and rates.
+Show the report for the selected period first, starting with its date and coverage caption. When a marker is selected, show the second report under **Since [marker name]**. Its window is the intersection of the selected range and the time starting at the marker, inclusive. Apply the same filters across chats to both. The marker adds only the inclusive cutoff. Show the marker timestamp and effective bounds, and display **No time in range** for an empty intersection. Use the [token accounting rules](../02-architecture/02-design/020-backend-class-design.md#token-accounting) for coverage and rates.
 
 ## 3.3 Content behavior
 
@@ -102,16 +86,7 @@ Metrics and charts update according to the Overview date range, sidebar filters,
 
 This document intentionally does not define:
 
-- exact field layout within the configuration block
 - exact chart types where unspecified
 - a separate manual-annotations management surface
 
 The spec remains minimal until a later UI pass adds page-specific details.
-
-## 3.4 Unresolved details
-
-The current scope does not confirm:
-
-- whether the configuration block is collapsible or always visible
-
-These are intentionally deferred.
