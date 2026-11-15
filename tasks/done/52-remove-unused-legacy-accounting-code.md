@@ -19,3 +19,10 @@ The supported application consists of [Overview and Manual annotations](../speci
 
 - Source search finds no cumulative counter calculation, cumulative reporting branches, or imports of removed symbols in the application. Current entry points import successfully, and shared timestamp parsing and response validation still run.
 - Overview filters and reporting, refresh actions, and Manual annotations operate through their current entry points. Current SQLite data and historical user-authored files are preserved.
+
+## Issue Logs
+
+### Failed check 1
+- `git diff --check` reports an extra blank line at the end of `src/internal/analytics/metrics.py` after removing retired code.
+- This fails the repository's required clean static checks for the task.
+- Remove the extra trailing blank line and rerun the checks.

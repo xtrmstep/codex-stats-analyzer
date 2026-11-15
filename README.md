@@ -32,8 +32,6 @@ Download the displayed usage report as CSV. Files use UTF-8 with BOM, standard C
 
 ## Local data and recovery
 
-`data/annotations.json` stores labels, assignments and runs. `data/experiments.json` stores comparison definitions and explicit history. These files and `.venv` are excluded from version control. Back up both JSON files while the application is not writing; restore them to `data/` to recover metadata. Original Codex source files are never used for annotation storage.
-
-Writes validate the versioned data, use a same-directory temporary file and atomic replacement, and check for concurrent changes. If a file is corrupt or its schema version is unsupported, preserve it and restore a backup or use a compatible application version; the app will not silently replace it with an empty document. A `.lock` file may remain after interruption: inspect it and remove it only after confirming no writer is active. Cooperating application writers use the lock; unrelated programs can ignore it.
+`data/codex_usage.sqlite3` stores imported records, saved time markers, and assigned agent names. Back up the database while the application is stopped to preserve them. Historical `data/annotations.json` and `data/experiments.json` files from retired views are left on disk but are no longer used by the dashboard. Original Codex source files are never used for annotation storage.
 
 

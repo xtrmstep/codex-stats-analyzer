@@ -127,7 +127,7 @@ def _render(sources, writer, page):
         return
 
     parsed = report_calculator.parsed
-    frame = build_dataset(parsed.events, [])
+    frame = build_dataset(parsed.events)
     usage_diagnostics = [item for item in report_calculator.diagnostics if item.get("kind") == "usage"]
     with filters:
         projects = {(row["project_key"], row["source_working_directory"]) for row in report_calculator.rows
