@@ -2,7 +2,9 @@
 
 from dataclasses import replace
 from datetime import datetime
+import os
 
+from dateutil import tz
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -19,17 +21,31 @@ def marker_selector(writer):
     return by_id.get(choice)
 
 
+def _local_timezone():
+    """Return the host's local zone with daylight-saving rules."""
+    return tz.tzwinlocal() if os.name == "nt" else tz.gettz()
+
+
+def _local_marker_timestamp(day, clock, zone):
+    """Resolve a local wall time only when it identifies exactly one instant."""
+    local = datetime.combine(day, clock).replace(tzinfo=zone)
+    if not tz.datetime_exists(local) or tz.datetime_ambiguous(local):
+        raise ValueError("Choose a local time that exists and is not repeated by a daylight-saving change.")
+    return local.isoformat()
+
+
 def marker_editor(writer):
     """Create, edit, or delete saved markers."""
     markers = list_markers(writer.connection)
     by_id = {marker.marker_id: marker for marker in markers}
+    zone = _local_timezone()
     if "new_marker_default_timestamp" not in st.session_state:
         st.session_state["new_marker_default_timestamp"] = datetime.now().astimezone().isoformat()
     if markers:
         ordered = sorted(markers, key=lambda item: datetime.fromisoformat(item.timestamp))
         st.dataframe(pd.DataFrame([
             {"Name": item.name,
-             "Local date and time": datetime.fromisoformat(item.timestamp).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")}
+             "Local date and time": datetime.fromisoformat(item.timestamp).astimezone(zone).strftime("%Y-%m-%d %H:%M:%S %Z")}
             for item in ordered
         ]), hide_index=True, use_container_width=True)
     else:
@@ -37,13 +53,19 @@ def marker_editor(writer):
     choice = st.selectbox("Marker to edit", ["Create new marker"] + list(by_id),
                           format_func=lambda key: by_id[key].name if key in by_id else key)
     selected = by_id.get(choice)
+    initial_timestamp = selected.timestamp if selected else st.session_state["new_marker_default_timestamp"]
+    initial = datetime.fromisoformat(initial_timestamp).astimezone(zone)
+    displayed_time = initial.time().replace(tzinfo=None, microsecond=0)
     with st.form("marker_editor"):
-        name = st.text_input("Name", value=selected.name if selected else "")
-        timestamp = st.text_input("Timestamp with time zone",
-                                  value=selected.timestamp if selected else st.session_state["new_marker_default_timestamp"])
+        name = st.text_input("Name", value=selected.name if selected else "", key=f"marker_name_{choice}")
+        st.caption(f"Local time zone: {initial.tzname()}")
+        day = st.date_input("Date", value=initial.date(), key=f"marker_date_{choice}")
+        clock = st.time_input("Time", value=displayed_time, step=1, key=f"marker_time_{choice}")
         save = st.form_submit_button("Save marker")
     if save:
         try:
+            timestamp = (initial_timestamp if selected and day == initial.date() and clock == displayed_time
+                         else _local_marker_timestamp(day, clock, zone))
             save_marker(writer, name, timestamp, selected.marker_id if selected else None)
             st.rerun()
         except (ValueError, OverflowError) as exc:
