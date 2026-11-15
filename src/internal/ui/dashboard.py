@@ -73,9 +73,19 @@ def _render(sources, writer, page):
     configuration = st.container()
     with configuration:
         st.subheader("Overview configuration")
-        preset = st.selectbox("Date range", ["Today", "All Time", "Current week", "Last week",
-                                             "Current month", "Last month"])
-        start, end = _date_limits(preset, date.today())
+        presets = ["Today", "All Time", "Current week", "Last week", "Current month", "Last month"]
+        today = date.today()
+        limits = {name: _date_limits(name, today) for name in presets}
+
+        def date_label(name):
+            first, last = limits[name]
+            if first is None:
+                return name
+            dates = first.isoformat() if name == "Today" else f"{first.isoformat()} to {last.isoformat()}"
+            return f"{name} ({dates})"
+
+        preset = st.selectbox("Date range", presets, format_func=date_label, key="overview_date_range")
+        start, end = limits[preset]
         refresh_requested = st.button("Refresh sources")
         bucket = st.radio("Time aggregation", ["hourly", "daily", "weekly", "monthly"], index=1, horizontal=True)
 
