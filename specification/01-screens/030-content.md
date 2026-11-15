@@ -6,9 +6,9 @@ This document defines the minimal content area for the two supported application
 
 ```text
 +--------------------------------------------------------------------------+
-| [3.1] View Parameters / View Configuration                                |
+|   [Incremental refresh]  [Full refresh from source]                       |
+| [3.1] Overview configuration                                             |
 |   - date range                                                            |
-|   - source refresh                                                        |
 |   - time aggregation                                                      |
 +--------------------------------------------------------------------------+
 | [3.2] Metrics                                                            |
@@ -28,7 +28,7 @@ This conceptual layout corresponds to the main content region in [000-main-layou
 
 ### 3.2.1 View Parameters / View Configuration
 
-Show **Date range**, **Incremental refresh**, **Full refresh from source**, and **Time aggregation**. Time aggregation offers hourly, daily, weekly, and monthly buckets. Overview results use the date range and the [sidebar filters](./010-navigation.md#15-filters).
+Show **Incremental refresh** and **Full refresh from source** side by side in a single row immediately above the **Overview configuration** heading. Under the heading, show **Date range** and **Time aggregation**. Time aggregation offers hourly, daily, weekly, and monthly buckets. Overview results use the date range and the [sidebar filters](./010-navigation.md#15-filters).
 
 **Incremental refresh** loads new records and retains imported history. **Full refresh from source** replaces the imported dataset with the source records currently available. Explain beside the full refresh action that previously imported history can disappear and that saved markers and agent names are kept. See [source collection](../02-architecture/02-design/000-system-overview.md#component-behavior).
 
