@@ -26,13 +26,13 @@ Use one agent to plan, implement, validate, and correct work end to end.
 
 ## Git workflow
 
-Use this Git workflow for task branches, validation loops, and explicit merge requests.
+Use this Git workflow for task branches, validation, and merging completed work.
 
 ### Conventions
 
 - **Default branch:** The branch configured as default on the remote repository; never assume it is named `main`.
 - **Task branch:** A dedicated branch for one task, created from the latest remote default branch.
-- **Working branch:** The current task branch whose changes may later be merged.
+- **Working branch:** The current task branch being prepared for merge.
 - **Iteration:** One implementation or follow-up correction cycle, completed with checks, a commit, and a push.
 - **Upstream:** The configured remote branch used for pulling and pushing a local branch.
 
@@ -60,7 +60,7 @@ flowchart TD
     L -- No --> X
     L -- Yes --> M{"More iterations for this task?"}
     M -- Yes --> F
-    M -- No --> N([Task branch ready])
+    M -- No --> N([Run the merge workflow unless the user requests a hold])
 ```
 
 #### Execution rules
@@ -71,6 +71,7 @@ flowchart TD
 4. Create one implementation commit per completed task. Create later review/fix commits separately, one logical change per commit. Do not amend or squash unless explicitly requested.
 5. Push the task branch after each completed iteration. Set upstream on first push. The task workflow authorizes these commits and pushes.
 6. If branch creation, checks, commit, or push cannot complete, stop and report the blocker with current committed/uncommitted/unpushed state.
+7. When authorized repository changes pass verification and the task branch is pushed, run the merge workflow unless the user asks to hold the branch for review.
 
 #### Commit messages
 
@@ -86,11 +87,11 @@ Examples:
 
 ### 2. Merge working branch into default branch
 
-Run this workflow only when the user explicitly requests a merge into the default branch. That request authorizes pushing the updated default branch and deleting the working branch after the push succeeds.
+Authorization to make repository changes includes merging the verified task, pushing the updated default branch, and deleting the task branch after that push succeeds. Honor any user request to hold the merge.
 
 ```mermaid
 flowchart TD
-    A([Explicit merge request]) --> B["Remember current working branch"]
+    A([Verified task ready to merge]) --> B["Remember current working branch"]
     B --> C["Check, commit and push pending changes"]
     C --> D{"Working branch ready?"}
     D -- No --> X([Report blocker and stop])
@@ -98,10 +99,9 @@ flowchart TD
     E --> F["Pull default branch with fast-forward only"]
     F --> G{"Pull successful?"}
     G -- No --> X
-    G -- Yes --> H["Merge working branch with fast-forward only"]
-    H --> I{"Merge successful?"}
-    I -- No --> J["Preserve branches; report divergence"]
-    J --> X
+    G -- Yes --> H["Fast-forward if possible, otherwise merge and resolve conflicts"]
+    H --> I{"Merge result passes checks?"}
+    I -- No --> X
     I -- Yes --> K["Push updated default branch"]
     K --> L{"Push successful?"}
     L -- No --> X
@@ -116,16 +116,16 @@ flowchart TD
 1. Record the current working branch before switching. Verify task changes are checked, then commit and push pending changes.
 2. Discover the remote default branch as defined above. Switch to its local tracking branch (create it if missing).
 3. Update default branch with `git pull --ff-only`. If this fails, stop and report divergence.
-4. Merge with `git merge --ff-only <working-branch>`. No merge commits, automatic rebases, force pushes, or conflict-resolution shortcuts.
-5. If fast-forward merge is not possible, preserve both branches, report divergence, and stop.
+4. Merge with `git merge --ff-only <working-branch>` when possible. If the task branch and updated default branch have diverged, attempt a normal merge with `git merge --no-ff --no-commit <working-branch>`. Resolve conflicts within the task scope while preserving the intent of both branches.
+5. Run relevant checks on the merged result before committing a pending merge and pushing the default branch. If a conflict cannot be resolved confidently or checks cannot pass, abort the merge if it is still in progress, preserve both branches, and report the blocker.
 6. After successful merge, push default branch, then delete working branch remotely and locally.
 7. If push or cleanup fails, report exactly what succeeded and what remains.
 
 ### Shared safety rules
 
-- Never guess default branch names or force conflicting history updates.
+- Discover the default branch before operating on it. Use the merge workflow to integrate task branches. Automatic rebases and force pushes are prohibited.
 - Keep each commit to one logical change.
-- Do not merge or delete branches without explicit authorization and successful checks.
+- Merge only authorized, verified task changes. Delete the task branch only after the merged result is pushed successfully.
 - Preserve recoverable work; report blockers instead of destructive improvisation.
 
 ## 1. Repo structure
@@ -207,7 +207,7 @@ Execute numbered Markdown tasks from `tasks/` one at a time, in numeric-prefix o
 |---|---|
 | Pending task | A numbered `.md` file directly inside `tasks/`. |
 | Task filename | A numeric prefix followed by a short description, for example `15-remove-source-changes.md`. Preserve existing filenames. |
-| Completed task | A verified task moved to `tasks/done/`, retaining filename. |
+| Completed task | A verified task moved to `tasks/done/` with its changes on the remote default branch. |
 | Incomplete task | A task moved to `tasks/incomplete/` after five failed verification checks, retaining filename and issue history. |
 | Issue Logs | Append-only section at the bottom of the task file; original task content remains unchanged. |
 | Verification check | Model-performed static inspection of real changes against requirements and acceptance criteria. |
@@ -251,7 +251,10 @@ flowchart TD
     W --> X["Push task branch"]
     X --> Y{"Push successful?"}
     Y -- No --> Err(["Report blocker and stop"])
-    Y -- Yes --> B
+    Y -- Yes --> Merge["Run the default-branch merge workflow"]
+    Merge --> Integrated{"Task merged and pushed?"}
+    Integrated -- No --> Pending
+    Integrated -- Yes --> B
 ```
 
 #### 4. Execution steps
@@ -264,7 +267,7 @@ flowchart TD
 | Implement | Task and scope-limited plan | Make only required implementation changes. |
 | Verify | Actual changes, original task, acceptance criteria | Inspect statically and determine pass/fail. |
 | Record and fix | Failed verification findings and existing `Issue Logs` | Append findings before fixing, then verify again. |
-| Complete | Passing verification and task changes | Move task to `tasks/done/`, commit, and push. |
+| Complete | Passing verification and task changes | Move task to `tasks/done/`, commit, push, and merge using the default-branch workflow. |
 | Release incomplete | Five failed checks and accumulated findings | Append final diagnosis, move task to `tasks/incomplete/`, commit, push, report failure, and stop. |
 
 When an issue is found, append a new entry under `## Issue Logs` (create if missing).
@@ -286,7 +289,7 @@ Keep prior entries intact. On the fifth failure, append a final unresolved summa
 
 #### 6. Completion conditions
 
-A task is done only if requirements and acceptance criteria pass static verification, the task file is moved to `tasks/done/`, and relevant changes are committed and pushed.
+A task is done only when requirements and acceptance criteria pass static verification and the changes, including the move to `tasks/done/`, are on the remote default branch.
 
 A task is incomplete after five failed verification checks. Preserve issue history and final diagnosis in `tasks/incomplete/`, persist state when possible, report blockers, and stop.
 
