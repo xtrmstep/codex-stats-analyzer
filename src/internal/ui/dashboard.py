@@ -129,7 +129,6 @@ def _render(sources, writer, page):
 
     parsed = report_calculator.parsed
     frame = build_dataset(parsed.events)
-    usage_diagnostics = [item for item in report_calculator.diagnostics if item.get("kind") == "usage"]
     with filters:
         projects = {(row["project_key"], row["source_working_directory"]) for row in report_calculator.rows
                     if row["project_key"] is not None}
@@ -173,10 +172,5 @@ def _render(sources, writer, page):
     )
     if selected.empty:
         st.info("No observed events match the selected filters.")
-    with st.expander(f"Parsing and usage diagnostics ({len(parsed.diagnostics) + len(usage_diagnostics)})"):
-        for item in parsed.diagnostics:
-            st.write(f"{item.source}:{item.line or '-'} — {item.message}")
-        for item in usage_diagnostics:
-            st.write(item["message"])
 
 
