@@ -18,11 +18,12 @@ TOKEN_FIELDS = ("total_tokens", "input_tokens", "output_tokens", "cached_input_t
 
 @dataclass(frozen=True)
 class TimeMarker:
-    """A named offset-bearing timestamp retained across imports and restarts."""
+    """An offset-bearing cutoff with a name and optional description."""
 
     marker_id: str
     name: str
     timestamp: str
+    description: str = ""
 
 
 @dataclass(frozen=True)
@@ -65,11 +66,13 @@ class UsageMeasurement:
 def list_markers(connection: sqlite3.Connection) -> list[TimeMarker]:
     """Read saved markers in name order."""
     return [TimeMarker(*row) for row in connection.execute(
-        "SELECT marker_id, name, timestamp FROM time_markers ORDER BY name COLLATE NOCASE, marker_id"
+        "SELECT marker_id, name, timestamp, description FROM time_markers ORDER BY name COLLATE NOCASE, marker_id"
     )]
 
 
-def save_marker(writer, name: str, timestamp: str, marker_id: str | None = None) -> TimeMarker:
+def save_marker(
+    writer, name: str, timestamp: str, marker_id: str | None = None, *, description: str = ""
+) -> TimeMarker:
     """Create or edit one marker using the generic writer transaction."""
     name = name.strip()
     if not name:
@@ -77,7 +80,7 @@ def save_marker(writer, name: str, timestamp: str, marker_id: str | None = None)
     stamp = pd.Timestamp(timestamp)
     if pd.isna(stamp) or stamp.tzinfo is None:
         raise ValueError("Marker timestamp must include a time zone.")
-    marker = TimeMarker(marker_id or str(uuid4()), name, timestamp)
+    marker = TimeMarker(marker_id or str(uuid4()), name, timestamp, description)
     if marker_id and not writer.connection.execute(
         "SELECT 1 FROM time_markers WHERE marker_id = ?", (marker_id,)
     ).fetchone():

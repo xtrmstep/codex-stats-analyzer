@@ -54,7 +54,7 @@ class DatabaseWriter:
     def _initialize_schema(self) -> None:
         with self.transaction():
             version = self.connection.execute("PRAGMA user_version").fetchone()[0]
-            if version > 10:
+            if version > 11:
                 raise ValueError(f"Unsupported database schema version: {version}")
             if version == 0:
                 self.connection.execute("CREATE TABLE IF NOT EXISTS logs (log_identity TEXT PRIMARY KEY)")
@@ -160,6 +160,10 @@ class DatabaseWriter:
                         "ON CONFLICT(id) DO NOTHING"
                     )
                 self.connection.execute("PRAGMA user_version = 10")
+                version = 10
+            if version == 10:
+                self.connection.execute("ALTER TABLE time_markers ADD COLUMN description TEXT NOT NULL DEFAULT ''")
+                self.connection.execute("PRAGMA user_version = 11")
 
     @contextmanager
     def transaction(self):

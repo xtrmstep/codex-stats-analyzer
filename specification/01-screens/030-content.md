@@ -99,8 +99,8 @@ The spec remains minimal until a later UI pass adds page-specific details.
 
 ## 3.4 Manual Annotations
 
-Show **Manual Annotations** as the page heading, with **Add new** above a table with **Name**, **Timestamp**, and **Actions** columns. List all saved markers from oldest to newest. Display each timestamp in the app's local time as `YYYY-MM-DD HH:MM:SS`. Show **No saved time markers** when the list is empty. Each row has **Edit** and **Delete** buttons. **Delete** removes that row's marker and refreshes the table.
+Show **Manual Annotations** as the page heading, with **Add new** above a table with **Name**, **Timestamp**, **Description**, and **Actions** columns. List all saved markers from oldest to newest. Display each timestamp in the app's local time as `YYYY-MM-DD HH:MM:SS`. Show **No saved time markers** when the list is empty. Each row has **Edit** and **Delete** buttons. **Delete** removes that row's marker and refreshes the table.
 
-Start with the form hidden. **Add new** opens a form below the table with a blank name and the current local date and time. **Edit** opens the same form with the selected marker's name and local date and time. Use **Date** and **Time** pickers and indicate the app's local time zone in the form. **Save** refreshes the table and closes the form on success. Keep the form open with the entered values and a message if validation fails.
+Start with the form hidden. **Add new** opens a form below the table with a blank name and description and the current local date and time. **Edit** opens the same form with the selected marker's saved values. **Description** is optional free text. Use **Date** and **Time** pickers and indicate the app's local time zone in the form. **Save** refreshes the table and closes the form on success. Keep the form open with the entered values and a message if validation fails.
 
-Preserve the saved instant on a name-only edit. Save changed times with the offset for the selected date and time. For a skipped or repeated local time, ask for a time that identifies one instant.
+Preserve the saved instant when only the name or description changes. Save changed times with the offset for the selected date and time. For a skipped or repeated local time, ask for a time that identifies one instant.

@@ -44,15 +44,18 @@ def marker_editor(writer):
         st.session_state["marker_editor_target"] = "new"
         st.session_state["marker_editor_initial"] = datetime.now().astimezone(zone).isoformat()
     if markers:
-        name_column, timestamp_column, actions_column = st.columns([3, 3, 2])
+        widths = [2, 3, 4, 3]
+        name_column, timestamp_column, description_column, actions_column = st.columns(widths)
         name_column.markdown("**Name**")
         timestamp_column.markdown("**Timestamp**")
+        description_column.markdown("**Description**")
         actions_column.markdown("**Actions**")
         ordered = sorted(markers, key=lambda item: datetime.fromisoformat(item.timestamp))
         for item in ordered:
-            name_column, timestamp_column, actions_column = st.columns([3, 3, 2])
+            name_column, timestamp_column, description_column, actions_column = st.columns(widths)
             name_column.text(item.name)
             timestamp_column.text(datetime.fromisoformat(item.timestamp).astimezone(zone).strftime("%Y-%m-%d %H:%M:%S"))
+            description_column.text(item.description)
             edit_column, delete_column = actions_column.columns(2)
             if edit_column.button("Edit", key=f"marker_edit_{item.marker_id}"):
                 st.session_state["marker_editor_generation"] = st.session_state.get("marker_editor_generation", 0) + 1
@@ -77,6 +80,9 @@ def marker_editor(writer):
     generation = st.session_state["marker_editor_generation"]
     with st.form("marker_editor"):
         name = st.text_input("Name", value=selected.name if selected else "", key=f"marker_name_{generation}")
+        description = st.text_area(
+            "Description", value=selected.description if selected else "", key=f"marker_description_{generation}"
+        )
         st.caption(f"Local time zone: {initial.tzname()}")
         day = st.date_input("Date", value=initial.date(), key=f"marker_date_{generation}")
         clock = st.time_input("Time", value=displayed_time, step=1, key=f"marker_time_{generation}")
@@ -85,7 +91,7 @@ def marker_editor(writer):
         try:
             timestamp = (initial_timestamp if selected and day == initial.date() and clock == displayed_time
                          else _local_marker_timestamp(day, clock, zone))
-            save_marker(writer, name, timestamp, selected.marker_id if selected else None)
+            save_marker(writer, name, timestamp, selected.marker_id if selected else None, description=description)
             st.session_state.pop("marker_editor_target", None)
             st.rerun()
         except (ValueError, OverflowError) as exc:
