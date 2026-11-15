@@ -31,7 +31,9 @@ The second block displays summary metrics and trend visualizations.
 
 #### 3.2.2.1 Overview KPIs
 
-Show a compact, read-only KPI table above the charts for each reporting window with results. Use **Name**, **Value**, and **Description** as the three column headers, in that order. Use tight cell spacing, right-align values, and let formula descriptions wrap on narrow screens. Display the formulas below in the listed row order, using **Unknown** for unavailable values. Show the agent count and coverage alongside the table. Distinguish observed facts, manual annotations, and estimates. Use the [token accounting and rate rules](../02-architecture/02-design/020-backend-class-design.md#token-accounting).
+Show a compact, read-only KPI table above the charts. The standard columns are **Name**, **Value**, and **Description**, in that order. Use tight cell spacing, right-align values, and let formula descriptions wrap on narrow screens. Display the formulas below in the listed row order, using **Unknown** for unavailable values. Show the agent count and coverage alongside the table. Distinguish observed facts, manual annotations, and estimates. Use the [token accounting and rate rules](../02-architecture/02-design/020-backend-class-design.md#token-accounting).
+
+When comparison is enabled, add a right-aligned **Previous period** value column between **Value** and **Description** in the selected-period table. Keep one row per KPI and use **Unknown** for unavailable comparison values.
 
 | Name | Description |
 | --- | --- |
@@ -47,9 +49,11 @@ The formulas summarize the relationships between KPIs. Values use recorded count
 
 #### 3.2.2.2 Trends and charts
 
-Below the KPIs for each reporting window, show seven charts in these two sections, in order.
+Below the KPIs, show the seven chart views in these two sections, in order.
 
 Show the charts in a single column with compact heights, margins, and title spacing. Give charts more room when needed for readable axis labels, legends, or project facet labels.
+
+When comparison is enabled, show the Overview charts in two columns headed **Selected period** and **Previous period**, with the inclusive dates under each heading. Pair corresponding charts on the same row. Keep the empty state in its chart cell when that period has no plottable usage.
 
 | Section | Chart | Grouping |
 | --- | --- | --- |
@@ -75,7 +79,9 @@ Users can create, rename, edit, and delete named timestamps. Markers have no cha
 
 Filter by inclusive recorded calendar date, group using recorded clock labels (with weeks starting Monday), and display recorded timestamps and offsets. Compare marker instants using their offsets. When mixed offsets do not establish a single elapsed duration, leave the corresponding rate unknown.
 
-Show the report for the selected period first, starting with its date and coverage caption. When a marker is selected, show the second report under **Since [marker name]**. Its window is the intersection of the selected range and the time starting at the marker, inclusive. Apply the same filters across chats to both. The marker adds only the inclusive cutoff. Show the marker timestamp and effective bounds, and display **No time in range** for an empty intersection. Use the [token accounting rules](../02-architecture/02-design/020-backend-class-design.md#token-accounting) for coverage and rates.
+Show the report for the selected period first, starting with its date and coverage caption. With [Compare to previous period](./010-navigation.md#compare-to-previous-period) enabled, compare it with the immediately preceding span of the same number of inclusive calendar days. The comparison ends one day before the selected period begins. For example, October 12–18 compares with October 5–11. Use the same active filters and time aggregation in both periods.
+
+When a marker is selected, show a separate **Since [marker name]** report below the Overview blocks, with its own three-column KPI table and single-column charts. Its window is the intersection of the selected range and the time starting at the marker, inclusive. Apply the same active filters and time aggregation. Show the marker timestamp and effective bounds, and display **No time in range** for an empty intersection. Use the [token accounting rules](../02-architecture/02-design/020-backend-class-design.md#token-accounting) for coverage and rates.
 
 ## 3.3 Content behavior
 
