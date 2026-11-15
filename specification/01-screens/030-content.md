@@ -35,13 +35,15 @@ Show a compact, read-only KPI table above the charts for each reporting window w
 
 | Name | Description |
 | --- | --- |
-| Total tokens | `sum(recorded total tokens)` = `Input tokens + Output tokens` when coverage is complete. |
-| Input tokens | `sum(recorded input tokens)` = `Cached input + Non-cached input` when coverage is complete. |
-| Output tokens | `sum(recorded output tokens)` |
-| Cached input | `sum(recorded cached input tokens)` |
-| Non-cached input | `sum(input tokens − cached input)` for records with both counts. |
-| Cache percentage | `100 × sum(cached input) ÷ sum(input tokens)` for records with both counts. |
-| Daily average | `Total tokens ÷ reporting window duration in days` |
+| Total tokens | `Input tokens + Output tokens` |
+| Input tokens | `Cached input + Non-cached input` |
+| Output tokens | `sum(response output tokens)` |
+| Cached input | `sum(response cached input)` |
+| Non-cached input | `Input tokens − Cached input` |
+| Cache percentage | `100 × Cached input ÷ Input tokens` |
+| Daily average | `Total tokens ÷ Elapsed days` |
+
+The formulas summarize the relationships between KPIs. Values use recorded counters and paired counts according to the token accounting rules. The coverage caption indicates incomplete data.
 
 #### 3.2.2.2 Trends and charts
 
