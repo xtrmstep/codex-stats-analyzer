@@ -102,17 +102,17 @@ def render_statistics(calculator, selection, marker, project_keys, selected_agen
         st.caption(f"{date_label}Effective instants: {start_label} to {end_label}. Coverage: {summary.coverage}.")
         kpis = [
             ("Total tokens", _number(summary.totals["total_tokens"]),
-             "`sum(recorded total tokens)` = `Input tokens + Output tokens` when coverage is complete."),
+             "`Input tokens + Output tokens`"),
             ("Input tokens", _number(summary.totals["input_tokens"]),
-             "`sum(recorded input tokens)` = `Cached input + Non-cached input` when coverage is complete."),
-            ("Output tokens", _number(summary.totals["output_tokens"]), "`sum(recorded output tokens)`"),
-            ("Cached input", _number(summary.totals["cached_input_tokens"]), "`sum(recorded cached input tokens)`"),
+             "`Cached input + Non-cached input`"),
+            ("Output tokens", _number(summary.totals["output_tokens"]), "`sum(response output tokens)`"),
+            ("Cached input", _number(summary.totals["cached_input_tokens"]), "`sum(response cached input)`"),
             ("Non-cached input", _number(summary.totals["non_cached_input_tokens"]),
-             "`sum(input tokens − cached input)` for records with both counts."),
+             "`Input tokens − Cached input`"),
             ("Cache percentage", _number(summary.cache_percentage, "%"),
-             "`100 × sum(cached input) ÷ sum(input tokens)` for records with both counts."),
+             "`100 × Cached input ÷ Input tokens`"),
             ("Daily average", _number(summary.average_daily_tokens),
-             "`Total tokens ÷ reporting window duration in days`"),
+             "`Total tokens ÷ Elapsed days`"),
         ]
         table_key = f"overview_kpis_{scope_index}"
         with st.container(key=table_key):
