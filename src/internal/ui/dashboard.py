@@ -89,9 +89,8 @@ def _render(sources, writer, page):
         start, end = limits[preset]
         bucket = st.radio("Time aggregation", ["hourly", "daily", "weekly", "monthly"], index=1, horizontal=True)
 
-    filters = st.sidebar.container()
+    filters = st.sidebar.expander("Filters", expanded=True)
     with filters:
-        st.subheader("Filters")
         marker = marker_selector(writer)
 
     reader = CodexLogReader()
