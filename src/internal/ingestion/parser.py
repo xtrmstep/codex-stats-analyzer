@@ -4,6 +4,7 @@ from collections import Counter
 from dataclasses import dataclass, field, replace
 import hashlib
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -98,6 +99,15 @@ def _normalize(raw: dict[str, Any], session_id: str, source: Path, line: int, re
         if isinstance(info, dict):
             token_counters = {key: info[key] for key in ("total_token_usage", "last_token_usage") if isinstance(info.get(key), dict)} or None
     evidence = None
+    if kind == "event_msg" and subtype in {"task_started", "task_complete", "turn_aborted"}:
+        evidence = {"type": subtype}
+        if subtype == "task_complete":
+            duration = payload.get("duration_ms")
+            valid_duration = (isinstance(duration, int) and not isinstance(duration, bool)) or (
+                isinstance(duration, float) and math.isfinite(duration))
+            evidence["duration_ms"] = duration if valid_duration else None
+            error = payload.get("error")
+            evidence["failed"] = error is not None and error is not False
     if kind == "event_msg" and subtype in {"collab_agent_spawn", "agent_started", "agent_completed", "skill_invoked"}:
         evidence = {"type": subtype}
         for key in ("agent_id", "parent_agent_id", "thread_id", "receiver_thread_id", "sender_thread_id", "role", "nickname", "skill_name", "started_at", "completed_at", "status"):
