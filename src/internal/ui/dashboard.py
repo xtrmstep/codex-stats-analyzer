@@ -72,6 +72,12 @@ def _render(sources, writer, page):
         st.subheader("Filters")
     configuration = st.container()
     with configuration:
+        refresh_columns = st.columns(2)
+        incremental_requested = refresh_columns[0].button("Incremental refresh")
+        full_requested = refresh_columns[1].button(
+            "Full refresh from source",
+            help="Replaces imported history with available source logs; saved markers and agent names are kept.",
+        )
         st.subheader("Overview configuration")
         presets = ["Today", "All Time", "Current week", "Last week", "Current month", "Last month"]
         today = date.today()
@@ -86,11 +92,6 @@ def _render(sources, writer, page):
 
         preset = st.selectbox("Date range", presets, format_func=date_label, key="overview_date_range")
         start, end = limits[preset]
-        incremental_requested = st.button("Incremental refresh")
-        full_requested = st.button(
-            "Full refresh from source",
-            help="Replaces imported history with available source logs; saved markers and agent names are kept.",
-        )
         bucket = st.radio("Time aggregation", ["hourly", "daily", "weekly", "monthly"], index=1, horizontal=True)
 
     with filters:
