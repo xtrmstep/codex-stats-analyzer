@@ -69,7 +69,9 @@ Resolve the presets against the app's local date each time Overview renders. In 
 
 | Preset | Date limits |
 | --- | --- |
-| **Today** (default) | Today's date |
+| **Today** | Today's date |
+| **Last 7 days** (default) | Six calendar days before today through today |
+| **Last 30 days** | Twenty-nine calendar days before today through today |
 | **All Time** | Unbounded |
 | **Current week** | This week's Monday through today |
 | **Last week** | Last week's Monday through Sunday |
