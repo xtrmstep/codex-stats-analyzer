@@ -88,9 +88,10 @@ def render_statistics(calculator, selection, marker, project_keys, selected_agen
                            agents=selected_agents)
     result = calculator.calculate(request)
     for scope_index, (scope, (summary, groups)) in enumerate(result.items()):
-        st.subheader(scope)
-        if marker and scope != "Full selected period":
-            st.caption(f"Marker: {marker.timestamp}")
+        if scope != "Full selected period":
+            st.subheader(scope)
+            if marker:
+                st.caption(f"Marker: {marker.timestamp}")
         if summary.empty_window:
             st.info("No time in range")
             continue
