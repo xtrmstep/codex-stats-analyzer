@@ -93,7 +93,7 @@ Users can create, rename, edit, and delete named timestamps. Markers have no cha
 
 Filter by inclusive recorded calendar date, group using recorded clock labels (with weeks starting Monday), and display recorded timestamps and offsets. Compare marker instants using their offsets. When mixed offsets do not establish a single elapsed duration, leave the corresponding rate unknown.
 
-Show **Full selected period** and, when a marker is selected, **Since [marker name]** together. The latter is the intersection of the selected range and the time starting at the marker, inclusive. Apply the same filters across chats to both; the marker adds only the inclusive cutoff. Show the marker timestamp and effective bounds, and display **No time in range** for an empty intersection. Place legacy deltas by observation time and flag uncertain attribution if a delta spans the cutoff. Use the [token accounting rules](../02-architecture/02-design/020-backend-class-design.md#token-accounting) for coverage and rates.
+Show **Full selected period** and, when a marker is selected, **Since [marker name]** together. The latter is the intersection of the selected range and the time starting at the marker, inclusive. Apply the same filters across chats to both. The marker adds only the inclusive cutoff. Show the marker timestamp and effective bounds, and display **No time in range** for an empty intersection. Use the [token accounting rules](../02-architecture/02-design/020-backend-class-design.md#token-accounting) for coverage and rates.
 
 ## 3.3 Content behavior
 
