@@ -1,6 +1,7 @@
 """Streamlit dashboard using the shared analytics contract."""
 
 from datetime import date, timedelta
+from html import escape
 import sqlite3
 
 import streamlit as st
@@ -8,6 +9,7 @@ import streamlit as st
 from internal.analytics.metrics import Filters, build_dataset, filter_dataset
 from internal.ingestion.collection import CodexLogImporter, CodexLogReader, DatabaseWriter
 from internal.ui.statistics_ui import marker_editor, marker_selector, render_statistics
+from internal.ui.project_labels import project_labels
 from internal.analytics.usage_statistics import StatsCalculation, reporting_agent_name
 
 
@@ -149,10 +151,25 @@ def _render(sources, writer, page):
 
     parsed = report_calculator.parsed
     frame = build_dataset(parsed.events)
+    labels = project_labels(report_calculator.rows)
+    ordered_projects = sorted(labels, key=lambda key: (labels[key].label.casefold(), labels[key].label, key))
     with filters:
         projects = {(row["project_key"], row["source_working_directory"]) for row in report_calculator.rows
                     if row["project_key"] is not None}
-        selected_projects = st.multiselect("Projects", sorted({row[0] for row in projects}))
+        selected_projects = st.multiselect("Projects", ordered_projects, format_func=lambda key: labels[key].label)
+        with st.expander("Project details", expanded=False):
+            if labels:
+                rows = "".join(
+                    f"<tr><td>{escape(labels[key].label)}</td>"
+                    f"<td>{escape(labels[key].identifier)}</td></tr>" for key in ordered_projects
+                )
+                st.markdown(
+                    '<table style="width:100%;table-layout:fixed;overflow-wrap:anywhere">'
+                    '<thead><tr><th>Short label</th><th>Full project identifier</th></tr></thead>'
+                    f'<tbody>{rows}</tbody></table>', unsafe_allow_html=True,
+                )
+            else:
+                st.info("No known projects.")
         project_keys = frozenset(selected_projects) if selected_projects else None
         source_projects = frozenset(row[1] for row in projects if row[0] in selected_projects and row[1])
         selection = Filters(start_date=start, end_date=end,
