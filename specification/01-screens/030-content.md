@@ -33,7 +33,7 @@ The second block displays summary metrics and trend visualizations.
 
 Show a compact, read-only KPI table above the charts. The standard columns are **Name**, **Value**, and **Description**, in that order. Use tight cell spacing, right-align values, and let formula descriptions wrap on narrow screens. Display the formulas below in the listed row order, using **Unknown** for unavailable values. Show the agent count and coverage alongside the table. Distinguish observed facts, manual annotations, and estimates. Use the [token accounting and rate rules](../02-architecture/02-design/020-backend-class-design.md#token-accounting).
 
-When comparison is enabled, add a right-aligned **Previous period** value column between **Value** and **Description** in the selected-period table. Keep one row per KPI and use **Unknown** for unavailable comparison values.
+When a comparison is active, add a right-aligned value column between **Value** and **Description**. Label it **Previous period** or **Since [marker name]**. Keep one row per KPI and use **Unknown** for unavailable comparison values.
 
 | Name | Description |
 | --- | --- |
@@ -53,7 +53,7 @@ Below the KPIs, show the seven chart views in these two sections, in order.
 
 Show the charts in a single column with compact heights, margins, and title spacing. Give charts more room when needed for readable axis labels, legends, or project facet labels.
 
-When comparison is enabled, show the Overview charts in two columns headed **Selected period** and **Previous period**, with the inclusive dates under each heading. Pair corresponding charts on the same row. Keep the empty state in its chart cell when that period has no plottable usage.
+When a comparison is active, show the selected-period charts on the left and the comparison charts on the right. Label the columns **Selected period** and either **Previous period** or **Since [marker name]**. Show each window's bounds below its heading, including the exact timestamp that starts a marker comparison. Pair matching charts on each row and keep the empty state in its chart cell when a window has no plottable usage.
 
 | Section | Chart | Grouping |
 | --- | --- | --- |
@@ -79,9 +79,12 @@ Manage saved time markers on the [Manual Annotations page](#34-manual-annotation
 
 Filter by inclusive recorded calendar date, group using recorded clock labels (with weeks starting Monday), and display recorded timestamps and offsets. Compare marker instants using their offsets. When mixed offsets do not establish a single elapsed duration, leave the corresponding rate unknown.
 
-Show the report for the selected period first, starting with its date and coverage caption. With [Compare to previous period](./010-navigation.md#compare-to-previous-period) enabled, compare it with the immediately preceding span of the same number of inclusive calendar days. The comparison ends one day before the selected period begins. For example, October 12–18 compares with October 5–11. Use the same active filters and time aggregation in both periods.
+Show the selected-period results with their date and coverage caption. Use the same active filters and time aggregation for either [comparison](./010-navigation.md#comparisons). With neither comparison active, show only the selected-period results.
 
-When a marker is selected, show a separate **Since [marker name]** report below the Overview blocks, with its own three-column KPI table and single-column charts. Its window is the intersection of the selected range and the time starting at the marker, inclusive. Apply the same active filters and time aggregation. Show the marker timestamp and effective bounds, and display **No time in range** for an empty intersection. Use the [token accounting rules](../02-architecture/02-design/020-backend-class-design.md#token-accounting) for coverage and rates.
+- **Previous period** uses the immediately preceding span of the same number of inclusive calendar days. For example, October 12–18 compares with October 5–11.
+- **Since [marker name]** starts at the marker's exact timestamp, inclusive, even if it predates the selected range. It runs through the selected end date, or through the report horizon for **All Time**. If the marker falls after the window ends, keep the selected-period results and show **No time in range** on the comparison side.
+
+Use the [token accounting rules](../02-architecture/02-design/020-backend-class-design.md#token-accounting) for coverage and rates.
 
 ## 3.3 Content behavior
 

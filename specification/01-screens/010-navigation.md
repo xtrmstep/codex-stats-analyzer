@@ -12,7 +12,8 @@ The sidebar provides navigation between **Overview** and **Manual Annotations** 
 |  1.1.2 Manual Annotations                                    |
 |                                                               |
 | Overview configuration                                       |
-|   Date range, Time aggregation, Compare to previous period    |
+|   Date range, Time aggregation                                |
+|   Compare to previous period, Saved time marker               |
 | Filters (collapsible)                                         |
 |                                                               |
 +---------------------------------------------------------------+
@@ -51,16 +52,16 @@ These remain open for later UI specification work.
 
 ## 1.5 Filters
 
-On Overview, show one collapsible **Filters** section below [Overview configuration](#16-overview-configuration). Start it expanded. Collapsing it hides the controls and keeps their selections active. It contains project, model, observed agent role, chat, agent name, execution mode, and saved time marker selection.
+On Overview, show one collapsible **Filters** section below [Overview configuration](#16-overview-configuration). Start it expanded. Collapsing it hides the controls and keeps their selections active. It contains project, model, observed agent role, chat, agent name, and execution mode.
 
 - **Chat** lists distinct known titles available for the selected dates and other applicable filters. It defaults to **All chats** and returns to that value if the selected title becomes unavailable. A selected title includes the main agent and all subagents that have inherited that title from their verified root. If several chats share the same title, the option includes all of them. Usage from untitled chats remains available under **All chats**.
 - **Agent** lists distinct agent and subagent names and defaults to **All agents**. Use the [reporting name](./030-content.md#3222-trends-and-charts) for each execution. With **All chats**, a selected name matches executions across chats. A selected chat title narrows the available agent names and the results. Keep a selected agent name while it remains available and reset to **All agents** when it becomes unavailable. **Agent roles** filters by observed role and combines with both selections.
 
-The filters determine which records contribute to Overview results. The saved time marker adds the [since-marker report](./030-content.md#reporting-windows).
+The filters determine which records contribute to both the selected-period and comparison results.
 
 ## 1.6 Overview configuration
 
-On Overview, show **Overview configuration** below **Navigation** and above **Filters**. It contains **Date range**, **Time aggregation**, and **Compare to previous period**, in that order. Time aggregation offers hourly, daily, weekly, and monthly buckets.
+On Overview, show **Overview configuration** below **Navigation** and above **Filters**. It contains **Date range**, **Time aggregation**, and the [comparison controls](#comparisons), in that order. Time aggregation offers hourly, daily, weekly, and monthly buckets.
 
 ### Date range
 
@@ -77,6 +78,8 @@ Resolve the presets against the app's local date each time Overview renders. In 
 | **Current month** | This month's first day through today |
 | **Last month** | Last month's first through last day |
 
-### Compare to previous period
+<a name="compare-to-previous-period"></a>
 
-Show an unchecked checkbox by default. Disable it for **All Time**. Enabling it displays the [previous-period comparison](./030-content.md#reporting-windows) in the Overview KPI table and charts.
+### Comparisons
+
+Show **Compare to previous period** unchecked by default, with **Saved time marker** directly below it and set to **None** by default. An active previous-period comparison disables the marker selector and ignores its value. When the checkbox is off, re-enable the selector and restore its selection if the marker still exists. **All Time** disables previous-period comparison and keeps the marker selector available. See [reporting windows](./030-content.md#reporting-windows).
