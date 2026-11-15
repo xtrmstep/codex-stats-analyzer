@@ -96,10 +96,11 @@ def render_statistics(calculator, selection, marker, project_keys, selected_agen
         if summary.empty_window:
             st.info("No time in range")
             continue
-        start_label = summary.start.isoformat() if summary.start is not None else "Unknown"
-        end_label = summary.end.isoformat() if summary.end is not None else "Unknown"
-        date_label = f"Recorded dates: {selection.start_date or 'unbounded'} to {selection.end_date or 'unbounded'} (inclusive). " if selection.start_date or selection.end_date else ""
-        st.caption(f"{date_label}Effective instants: {start_label} to {end_label}. Coverage: {summary.coverage}.")
+        if scope != "Full selected period":
+            start_label = summary.start.isoformat() if summary.start is not None else "Unknown"
+            end_label = summary.end.isoformat() if summary.end is not None else "Unknown"
+            date_label = f"Recorded dates: {selection.start_date or 'unbounded'} to {selection.end_date or 'unbounded'} (inclusive). " if selection.start_date or selection.end_date else ""
+            st.caption(f"{date_label}Effective instants: {start_label} to {end_label}. Coverage: {summary.coverage}.")
         kpis = [
             ("Total tokens", _number(summary.totals["total_tokens"]),
              "Total tokens used for model input and output. `Input tokens + Output tokens`"),
@@ -134,8 +135,6 @@ def render_statistics(calculator, selection, marker, project_keys, selected_agen
             """, unsafe_allow_html=True)
             st.markdown("| Name | Value | Description |\n| --- | --- | --- |\n" +
                         "\n".join(f"| {name} | {value} | {description} |" for name, value, description in kpis))
-        st.caption(f"Agent threads: {summary.agents:,}")
-        st.caption("Missing, conflicting, or incomplete response usage can make coverage partial.")
         sections = (
             ("Token consumption over time", (
                 ("Project over time", "Project over time", "Project"),
