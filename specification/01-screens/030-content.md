@@ -32,7 +32,7 @@ Show **Date range**, **Refresh sources**, and **Time aggregation**. Time aggrega
 
 #### Date range
 
-Show a **Date range** selector in Overview configuration. Resolve the selected preset against the app's local date each time Overview renders. Both date limits are inclusive.
+Show a **Date range** selector in Overview configuration. Resolve the presets against the app's local date each time Overview renders. In the option list and the selected value, show each bounded preset's name followed by its inclusive dates in `YYYY-MM-DD` format. **Today** shows one date, and **All Time** shows its name alone. Reports use the same bounds shown in the selector.
 
 | Preset | Date limits |
 | --- | --- |
