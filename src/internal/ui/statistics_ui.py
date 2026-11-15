@@ -70,7 +70,6 @@ def _row(measurement, view=None):
         "Reasoning output": measurement.totals["reasoning_output_tokens"],
         "Cache %": measurement.cache_percentage,
         "Daily average": measurement.average_daily_tokens,
-        "Subagent share %": measurement.subagent_share,
         "Coverage": measurement.coverage,
         "Agents": measurement.agents,
         "Empty window": measurement.empty_window,
@@ -127,14 +126,10 @@ def render_statistics(calculator, selection, marker, project_keys, selected_agen
                           help="Share of input served from cache where both input counts are known.")
         columns[4].metric("Daily average", _number(summary.average_daily_tokens),
                           help="Total tokens divided by the reporting window's duration in days.")
-        extra_columns = st.columns(4)
-        extra_columns[0].metric("Turn throughput", _number(summary.turn_throughput, " tokens/s"),
-                                help="Output tokens per second across eligible completed turns, including tool and wait time.")
-        extra_columns[1].metric("Subagent share", _number(summary.subagent_share, "%"),
-                                help="Share of total tokens attributable to subagents when usage and ownership are reliable.")
-        extra_columns[2].metric("Cached input", _number(summary.totals["cached_input_tokens"]),
+        extra_columns = st.columns(2)
+        extra_columns[0].metric("Cached input", _number(summary.totals["cached_input_tokens"]),
                                 help="Input tokens reused from cache.")
-        extra_columns[3].metric("Non-cached input", _number(summary.totals["non_cached_input_tokens"]),
+        extra_columns[1].metric("Non-cached input", _number(summary.totals["non_cached_input_tokens"]),
                                 help="Input minus cached input where both counts are known.")
         st.caption(f"Agent threads: {summary.agents:,}")
         st.caption("Missing, conflicting, or incomplete response usage can make coverage partial.")
@@ -179,5 +174,5 @@ def render_statistics(calculator, selection, marker, project_keys, selected_agen
     columns = {name: name.lower().replace(" ", "_").replace("%", "percentage") for name in
                ("Measurement", "Scope", "Start", "End", "Project", "Agent", "Model", "Time", "Total tokens", "Input tokens",
                 "Output tokens", "Cached input", "Non-cached input", "Cache-write input", "Reasoning output",
-                "Cache %", "Daily average", "Subagent share %", "Coverage", "Agents", "Empty window")}
+                "Cache %", "Daily average", "Coverage", "Agents", "Empty window")}
     st.download_button("Download usage CSV", csv_bytes(export_rows, columns), file_name="usage.csv", mime="text/csv")

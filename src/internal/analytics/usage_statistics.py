@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
-import json
 import sqlite3
 from uuid import uuid4
 
@@ -60,9 +59,7 @@ class UsageMeasurement:
     cache_percentage: float | None
     average_daily_tokens: float | None
     agents: int
-    subagent_share: float | None = None
     empty_window: bool = False
-    turn_throughput: float | None = None
 
 
 def list_markers(connection: sqlite3.Connection) -> list[TimeMarker]:
@@ -178,15 +175,10 @@ def _measure(rows, scope, start, end, project=None, agent=None, bucket=None, dia
     if any(row["coverage"] != "complete" for row in rows):
         complete = False
     coverage = "complete" if complete else "partial" if totals["total_tokens"] is not None else "unknown"
-    hierarchy_uncertain = any(item.get("kind") == "hierarchy" for item in diagnostics)
-    share = None
-    if complete and not hierarchy_uncertain and totals["total_tokens"]:
-        subagent_total = sum(row["total_tokens"] for row in rows if row["parent_execution_id"] is not None)
-        share = 100 * subagent_total / totals["total_tokens"]
     days = (end - start).total_seconds() / 86400 if start is not None and end is not None else 0
     daily = totals["total_tokens"] / days if totals["total_tokens"] is not None and days > 0 else None
     return UsageMeasurement(scope, start, end, project, agent, bucket, totals, coverage, cache, daily,
-                            len({row["execution_id"] for row in rows if row["execution_id"]}), share)
+                            len({row["execution_id"] for row in rows if row["execution_id"]}))
 
 
 class UsageCalculator:
@@ -271,122 +263,6 @@ class ModelUsageCalculator(UsageCalculator):
         return None, row["model"], None
 
 
-def _index_turn_events(events, threads):
-    """Index lifecycle events and response observations by verified turn."""
-    owners = {(row["session_id"], row["thread_id"]): row["execution_id"] for row in threads}
-    lifecycle = {}
-    responses = {}
-    response_turns = {}
-    for event in events:
-        owner = owners.get((event.session_id, event.thread_id)) if event.thread_id else None
-        if owner is None or not event.turn_id:
-            continue
-        turn = (owner, event.turn_id)
-        if event.event_type in {"event_msg.task_started", "event_msg.task_complete", "event_msg.turn_aborted"}:
-            lifecycle.setdefault(turn, []).append(event)
-
-        usage = (event.token_counters or {}).get("usage")
-        if isinstance(usage, dict):
-            responses.setdefault(turn, {}).setdefault(event.response_id, []).append(event)
-            if event.response_id:
-                response_turns.setdefault((owner, event.response_id), set()).add(event.turn_id)
-    return lifecycle, responses, response_turns
-
-
-def _turn_duration_in_window(timing, request, cutoff_key, end):
-    """Return the recorded duration in milliseconds for an eligible turn."""
-    starts = [event for event in timing if event.event_type == "event_msg.task_started"]
-    completions = [event for event in timing if event.event_type == "event_msg.task_complete"]
-    if not starts or not completions:
-        return None
-    if any(event.event_type == "event_msg.turn_aborted" for event in timing):
-        return None
-    if any((event.evidence or {}).get("failed") is not False for event in completions):
-        return None
-
-    try:
-        start_times = {_timestamp(event.timestamp) for event in starts}
-        end_times = {_timestamp(event.timestamp) for event in completions}
-        durations = {(event.evidence or {}).get("duration_ms") for event in completions}
-        if any(len(values) != 1 or None in values for values in (start_times, end_times, durations)):
-            return None
-
-        start_time, = start_times
-        finish_time, = end_times
-        duration_ms, = durations
-        if duration_ms <= 0 or finish_time < start_time:
-            return None
-
-        for stamp in (start_time, finish_time):
-            if not _date_matches(stamp, request):
-                return None
-            if cutoff_key is not None and _instant(stamp.isoformat()) < cutoff_key:
-                return None
-            if end is not None and stamp >= end:
-                return None
-    except (TypeError, ValueError, OverflowError):
-        return None
-
-    return duration_ms
-
-
-def _turn_output_tokens(owner, responses, response_turns, rows_by_record, window_ids):
-    """Return the output total when each observed response is verified in scope."""
-    if not responses:
-        return None
-
-    output_tokens = 0
-    for response_id, observations in responses.items():
-        if not response_id or len(response_turns[(owner, response_id)]) != 1:
-            return None
-
-        signatures = {json.dumps(event.token_counters["usage"], sort_keys=True) for event in observations}
-        if len(signatures) != 1:
-            return None
-
-        candidates = {}
-        for event in observations:
-            row = rows_by_record.get(event.record_id)
-            if row is not None:
-                candidates[row["usage_id"]] = row
-        if len(candidates) != 1:
-            return None
-
-        row, = candidates.values()
-        if row["execution_id"] != owner or row["usage_id"] not in window_ids:
-            return None
-        if row["coverage"] != "complete" or row["output_tokens"] is None:
-            return None
-        output_tokens += row["output_tokens"]
-
-    return output_tokens
-
-
-def _turn_throughput(events, threads, all_rows, window, request, cutoff_key, end):
-    """Return output tokens per second across complete turns in the window."""
-    lifecycle, responses, response_turns = _index_turn_events(events, threads)
-
-    rows_by_record = {row["source_record_id"]: row for row in all_rows}
-    window_ids = {row["usage_id"] for row in window}
-
-    output_sum = 0
-    duration_sum_ms = 0
-    for turn, timing in lifecycle.items():
-        duration_ms = _turn_duration_in_window(timing, request, cutoff_key, end)
-        if duration_ms is None:
-            continue
-
-        owner, _ = turn
-        output_tokens = _turn_output_tokens(owner, responses.get(turn), response_turns, rows_by_record, window_ids)
-        if output_tokens is None:
-            continue
-
-        output_sum += output_tokens
-        duration_sum_ms += duration_ms
-
-    return output_sum * 1000 / duration_sum_ms if duration_sum_ms else None
-
-
 class StatsCalculation:
     """Resolve report windows from a single committed database snapshot."""
 
@@ -410,7 +286,7 @@ class StatsCalculation:
             if not state or not state["initialized"]:
                 raise ValueError("No successful usage publication is available.")
             self.rows = [dict(row) for row in connection.execute(
-                "SELECT u.*, t.session_id, t.thread_id, t.agent_name, t.role, t.nickname, t.parent_execution_id, n.name AS assigned_name "
+                "SELECT u.*, t.session_id, t.thread_id, t.agent_name, t.role, t.nickname, n.name AS assigned_name "
                 "FROM usage_records u LEFT JOIN agent_threads t ON t.execution_id = u.execution_id "
                 "LEFT JOIN agent_names n ON n.execution_id = t.execution_id"
             )]
@@ -508,8 +384,6 @@ class StatsCalculation:
                                            and _instant(item["observed_at"]) >= cutoff_key))]
             summary = _measure(window, scope, display_start, effective_end, diagnostics=scoped_diagnostics, empty=empty)
             if not empty:
-                summary = replace(summary, turn_throughput=_turn_throughput(
-                    self.events, self.threads, rows, window, request, cutoff_key, end))
                 observed_agents = {row["execution_id"] for row in window if row["execution_id"]}
                 for session_id, execution_id, stamp, stamp_key in observations:
                     if (cutoff_key is not None and (stamp_key is None or stamp_key < cutoff_key)) or (end is not None and (stamp is None or stamp >= end)):
