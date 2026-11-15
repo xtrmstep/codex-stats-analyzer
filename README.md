@@ -2,6 +2,9 @@
 
 A local Windows dashboard for exploring Codex token usage and agent activity.
 
+> [!IMPORTANT]
+> The analyzer calculates usage statistics from the local Codex app’s session logs. Codex web usage is excluded.
+
 ## Data sources
 
 The app imports local JSONL logs from `%USERPROFILE%\.codex\sessions` and `%USERPROFILE%\.codex\archived_sessions` into SQLite. Edit `config.toml` to change the source folders.
