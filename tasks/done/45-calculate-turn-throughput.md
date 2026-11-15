@@ -21,3 +21,10 @@ Follow the [turn throughput rule](../specification/02-architecture/02-design/020
 - Complete eligible turns with 900 output tokens in 20 seconds and 300 in 10 seconds produce **40.0 tokens/s**. Duplicate records have no effect. A qualifying zero-output sample renders zero. No eligible turns renders **Unknown**.
 - A turn cut by a date boundary, saved marker, or partial model or project filter is excluded from throughput for that scope while its eligible usage still contributes to the existing token metrics. Verify that both windows calculate separately, including a turn starting exactly at the marker.
 - Aborted, failed, conflicting, and legacy-only turns leave throughput unknown if there are no other eligible turns. Time aggregation has no effect on throughput. Existing KPIs, their help, and CSV values remain intact.
+
+## Issue Logs
+
+### Failed check 1
+- In `_turn_throughput` in `src/internal/analytics/usage_statistics.py`, repeated references to the same response record produced multiple candidate rows and rejected a valid turn.
+- This violates the criterion that duplicate observations have no effect on throughput.
+- Deduplicate candidate rows by their stable usage identity before validating the complete response set.

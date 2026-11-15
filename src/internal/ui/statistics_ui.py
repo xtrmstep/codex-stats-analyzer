@@ -128,7 +128,7 @@ def render_statistics(calculator, selection, marker, project_keys, selected_agen
         columns[4].metric("Daily average", _number(summary.average_daily_tokens),
                           help="Total tokens divided by the reporting window's duration in days.")
         extra_columns = st.columns(4)
-        extra_columns[0].metric("Turn throughput", "Unknown",
+        extra_columns[0].metric("Turn throughput", _number(summary.turn_throughput, " tokens/s"),
                                 help="Output tokens per second across eligible completed turns, including tool and wait time.")
         extra_columns[1].metric("Subagent share", _number(summary.subagent_share, "%"),
                                 help="Share of total tokens attributable to subagents when usage and ownership are reliable.")

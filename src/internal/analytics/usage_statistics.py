@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
+import json
 import sqlite3
 from uuid import uuid4
 
@@ -61,6 +62,7 @@ class UsageMeasurement:
     agents: int
     subagent_share: float | None = None
     empty_window: bool = False
+    turn_throughput: float | None = None
 
 
 def list_markers(connection: sqlite3.Connection) -> list[TimeMarker]:
@@ -274,6 +276,76 @@ class ModelUsageCalculator(UsageCalculator):
         return None, row["model"], None
 
 
+def _turn_throughput(events, threads, all_rows, window, request, cutoff_key, end):
+    """Calculate throughput only for complete, independently counted turns."""
+    owners = {(row["session_id"], row["thread_id"]): row["execution_id"] for row in threads}
+    lifecycle, responses, response_turns = {}, {}, {}
+    for event in events:
+        owner = owners.get((event.session_id, event.thread_id)) if event.thread_id else None
+        if owner is None or not event.turn_id:
+            continue
+        turn = (owner, event.turn_id)
+        if event.event_type in {"event_msg.task_started", "event_msg.task_complete", "event_msg.turn_aborted"}:
+            lifecycle.setdefault(turn, []).append(event)
+        usage = (event.token_counters or {}).get("usage")
+        if isinstance(usage, dict):
+            responses.setdefault(turn, []).append(event)
+            if event.response_id:
+                response_turns.setdefault((owner, event.response_id), set()).add(event.turn_id)
+
+    rows_by_record = {row["source_record_id"]: row for row in all_rows
+                      if row["counter_provenance"] == "response"}
+    window_ids = {row["usage_id"] for row in window}
+    output_sum = duration_sum = 0
+    for turn, timing in lifecycle.items():
+        starts = [event for event in timing if event.event_type == "event_msg.task_started"]
+        completions = [event for event in timing if event.event_type == "event_msg.task_complete"]
+        if not starts or not completions or any(event.event_type == "event_msg.turn_aborted" for event in timing):
+            continue
+        try:
+            start_times = {_timestamp(event.timestamp) for event in starts}
+            end_times = {_timestamp(event.timestamp) for event in completions}
+            durations = {(event.evidence or {}).get("duration_ms") for event in completions}
+            if (len(start_times) != 1 or len(end_times) != 1 or None in start_times or None in end_times
+                    or len(durations) != 1 or None in durations
+                    or any((event.evidence or {}).get("failed") is not False for event in completions)):
+                continue
+            start_time, finish_time, duration = next(iter(start_times)), next(iter(end_times)), next(iter(durations))
+            if duration <= 0 or finish_time < start_time:
+                continue
+            if any(not _date_matches(stamp, request) or
+                   (cutoff_key is not None and _instant(stamp.isoformat()) < cutoff_key) or
+                   (end is not None and stamp >= end) for stamp in (start_time, finish_time)):
+                continue
+        except (TypeError, ValueError, OverflowError):
+            continue
+
+        observations = responses.get(turn, [])
+        if not observations or any(not event.response_id for event in observations):
+            continue
+        grouped = {}
+        for event in observations:
+            grouped.setdefault(event.response_id, []).append(event)
+        matched = []
+        for response_id, duplicates in grouped.items():
+            if len(response_turns[(turn[0], response_id)]) != 1:
+                break
+            signatures = {json.dumps(event.token_counters["usage"], sort_keys=True) for event in duplicates}
+            candidates = {rows_by_record[event.record_id]["usage_id"]: rows_by_record[event.record_id]
+                          for event in duplicates if event.record_id in rows_by_record}
+            if len(signatures) != 1 or len(candidates) != 1:
+                break
+            row = next(iter(candidates.values()))
+            if (row["execution_id"] != turn[0] or row["usage_id"] not in window_ids
+                    or row["coverage"] != "complete" or row["output_tokens"] is None):
+                break
+            matched.append(row)
+        else:
+            output_sum += sum(row["output_tokens"] for row in matched)
+            duration_sum += duration
+    return output_sum * 1000 / duration_sum if duration_sum else None
+
+
 class StatsCalculation:
     """Resolve report windows from a single committed database snapshot."""
 
@@ -417,6 +489,8 @@ class StatsCalculation:
             scoped_diagnostics += ([{"message": "Overlapping legacy agent counters withheld."}] if excluded else [])
             summary = _measure(window, scope, display_start, effective_end, diagnostics=scoped_diagnostics, empty=empty)
             if not empty:
+                summary = replace(summary, turn_throughput=_turn_throughput(
+                    self.events, self.threads, rows, window, request, cutoff_key, end))
                 observed_agents = {row["execution_id"] for row in window if row["execution_id"]}
                 for session_id, execution_id, stamp, stamp_key in observations:
                     if (cutoff_key is not None and (stamp_key is None or stamp_key < cutoff_key)) or (end is not None and (stamp is None or stamp >= end)):
