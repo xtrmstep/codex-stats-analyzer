@@ -39,40 +39,57 @@ def marker_editor(writer):
     markers = list_markers(writer.connection)
     by_id = {marker.marker_id: marker for marker in markers}
     zone = _local_timezone()
-    if "new_marker_default_timestamp" not in st.session_state:
-        st.session_state["new_marker_default_timestamp"] = datetime.now().astimezone().isoformat()
+    if st.button("Add new"):
+        st.session_state["marker_editor_generation"] = st.session_state.get("marker_editor_generation", 0) + 1
+        st.session_state["marker_editor_target"] = "new"
+        st.session_state["marker_editor_initial"] = datetime.now().astimezone(zone).isoformat()
     if markers:
+        name_column, timestamp_column, actions_column = st.columns([3, 3, 2])
+        name_column.markdown("**Name**")
+        timestamp_column.markdown("**Timestamp**")
+        actions_column.markdown("**Actions**")
         ordered = sorted(markers, key=lambda item: datetime.fromisoformat(item.timestamp))
-        st.dataframe(pd.DataFrame([
-            {"Name": item.name,
-             "Timestamp": datetime.fromisoformat(item.timestamp).astimezone(zone).strftime("%Y-%m-%d %H:%M:%S")}
-            for item in ordered
-        ]), hide_index=True, use_container_width=True)
+        for item in ordered:
+            name_column, timestamp_column, actions_column = st.columns([3, 3, 2])
+            name_column.text(item.name)
+            timestamp_column.text(datetime.fromisoformat(item.timestamp).astimezone(zone).strftime("%Y-%m-%d %H:%M:%S"))
+            edit_column, delete_column = actions_column.columns(2)
+            if edit_column.button("Edit", key=f"marker_edit_{item.marker_id}"):
+                st.session_state["marker_editor_generation"] = st.session_state.get("marker_editor_generation", 0) + 1
+                st.session_state["marker_editor_target"] = item.marker_id
+            if delete_column.button("Delete", key=f"marker_delete_{item.marker_id}"):
+                delete_marker(writer, item.marker_id)
+                if st.session_state.get("marker_editor_target") == item.marker_id:
+                    st.session_state.pop("marker_editor_target", None)
+                st.rerun()
     else:
         st.info("No saved time markers")
-    choice = st.selectbox("Marker to edit", ["Create new marker"] + list(by_id),
-                          format_func=lambda key: by_id[key].name if key in by_id else key)
-    selected = by_id.get(choice)
-    initial_timestamp = selected.timestamp if selected else st.session_state["new_marker_default_timestamp"]
+    target = st.session_state.get("marker_editor_target")
+    if target is None:
+        return
+    selected = by_id.get(target)
+    if target != "new" and selected is None:
+        st.session_state.pop("marker_editor_target", None)
+        return
+    initial_timestamp = selected.timestamp if selected else st.session_state["marker_editor_initial"]
     initial = datetime.fromisoformat(initial_timestamp).astimezone(zone)
     displayed_time = initial.time().replace(tzinfo=None, microsecond=0)
+    generation = st.session_state["marker_editor_generation"]
     with st.form("marker_editor"):
-        name = st.text_input("Name", value=selected.name if selected else "", key=f"marker_name_{choice}")
+        name = st.text_input("Name", value=selected.name if selected else "", key=f"marker_name_{generation}")
         st.caption(f"Local time zone: {initial.tzname()}")
-        day = st.date_input("Date", value=initial.date(), key=f"marker_date_{choice}")
-        clock = st.time_input("Time", value=displayed_time, step=1, key=f"marker_time_{choice}")
-        save = st.form_submit_button("Save marker")
+        day = st.date_input("Date", value=initial.date(), key=f"marker_date_{generation}")
+        clock = st.time_input("Time", value=displayed_time, step=1, key=f"marker_time_{generation}")
+        save = st.form_submit_button("Save")
     if save:
         try:
             timestamp = (initial_timestamp if selected and day == initial.date() and clock == displayed_time
                          else _local_marker_timestamp(day, clock, zone))
             save_marker(writer, name, timestamp, selected.marker_id if selected else None)
+            st.session_state.pop("marker_editor_target", None)
             st.rerun()
         except (ValueError, OverflowError) as exc:
             st.error(str(exc))
-    if selected and st.button("Delete marker"):
-        delete_marker(writer, selected.marker_id)
-        st.rerun()
 
 
 def _number(value, suffix=""):
