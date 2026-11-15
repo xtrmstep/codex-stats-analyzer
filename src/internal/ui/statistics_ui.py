@@ -45,7 +45,7 @@ def marker_editor(writer):
         ordered = sorted(markers, key=lambda item: datetime.fromisoformat(item.timestamp))
         st.dataframe(pd.DataFrame([
             {"Name": item.name,
-             "Local date and time": datetime.fromisoformat(item.timestamp).astimezone(zone).strftime("%Y-%m-%d %H:%M:%S %Z")}
+             "Timestamp": datetime.fromisoformat(item.timestamp).astimezone(zone).strftime("%Y-%m-%d %H:%M:%S")}
             for item in ordered
         ]), hide_index=True, use_container_width=True)
     else:
