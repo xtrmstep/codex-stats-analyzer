@@ -60,6 +60,7 @@ classDiagram
         project_key, agent_key, time_bucket
         token_totals, coverage
         cache_percentage, average_daily_tokens
+        turn_throughput
         empty_window
     }
     CodexUsage --> "1" CollectedCodexRecord : source record
