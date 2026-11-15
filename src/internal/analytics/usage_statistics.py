@@ -175,13 +175,12 @@ def _measure(rows, scope, start, end, project=None, agent=None, bucket=None, dia
     input_total = sum(row["input_tokens"] for row in eligible)
     cached_total = sum(row["cached_input_tokens"] for row in eligible)
     cache = 100 * cached_total / input_total if input_total else None
-    if any(row["coverage"] != "complete" or row["uncertain"] for row in rows):
+    if any(row["coverage"] != "complete" for row in rows):
         complete = False
     coverage = "complete" if complete else "partial" if totals["total_tokens"] is not None else "unknown"
     hierarchy_uncertain = any(item.get("kind") == "hierarchy" for item in diagnostics)
-    independently_counted = all(row["counter_provenance"] == "response" for row in rows)
     share = None
-    if complete and not hierarchy_uncertain and independently_counted and totals["total_tokens"]:
+    if complete and not hierarchy_uncertain and totals["total_tokens"]:
         subagent_total = sum(row["total_tokens"] for row in rows if row["parent_execution_id"] is not None)
         share = 100 * subagent_total / totals["total_tokens"]
     days = (end - start).total_seconds() / 86400 if start is not None and end is not None else 0
@@ -219,10 +218,6 @@ class UsageCalculator:
                     group_end = min(end, bucket_end) if end is not None else bucket_end
                 else:
                     group_start = group_end = None
-                group = [{**row, "uncertain": row["uncertain"] or (
-                    row["counter_provenance"] == "legacy_delta"
-                    and (row["prior"] is None or _bucket(row["prior"], request) != bucket)
-                )} for row in group]
             results.append(_measure(group, scope, group_start, group_end, project, agent, bucket, diagnostics))
         return results
 
@@ -371,8 +366,7 @@ def _turn_throughput(events, threads, all_rows, window, request, cutoff_key, end
     """Return output tokens per second across complete turns in the window."""
     lifecycle, responses, response_turns = _index_turn_events(events, threads)
 
-    rows_by_record = {row["source_record_id"]: row for row in all_rows
-                      if row["counter_provenance"] == "response"}
+    rows_by_record = {row["source_record_id"]: row for row in all_rows}
     window_ids = {row["usage_id"] for row in window}
 
     output_sum = 0
@@ -422,7 +416,6 @@ class StatsCalculation:
             )]
             self.diagnostics = [dict(row) for row in connection.execute("SELECT * FROM coverage_diagnostics")]
             self.threads = [dict(row) for row in connection.execute("SELECT t.*, n.name AS assigned_name FROM agent_threads t LEFT JOIN agent_names n ON n.execution_id = t.execution_id")]
-            self.parents = {row["execution_id"]: row["parent_execution_id"] for row in self.threads}
             records = CodexLogReader().replay_publication(connection)
             connection.commit()
         finally:
@@ -434,7 +427,6 @@ class StatsCalculation:
         """Return summary and grouped measurements for each requested scope."""
         rows = [row.copy() for row in self.rows]
         diagnostics = self.diagnostics
-        parents = self.parents
         start, end = _timestamp(request.start), _timestamp(request.end)
         if request.start_date and request.end_date and request.start_date > request.end_date:
             raise ValueError("The reporting start date must not be after the end date.")
@@ -447,9 +439,7 @@ class StatsCalculation:
                     ("role", request.roles), ("execution_id", request.agents), ("source_record_id", request.record_ids))):
                 continue
             row["observed"] = _timestamp(row["observed_at"])
-            row["prior"] = _timestamp(row["prior_observed_at"])
             row["observed_key"] = _instant(row["observed_at"])
-            row["prior_key"] = _instant(row["prior_observed_at"])
             if not _date_matches(row["observed"], request):
                 continue
             selected.append(row)
@@ -511,29 +501,11 @@ class StatsCalculation:
                 observed_at = row["observed"]
                 if (cutoff_key is not None and (row["observed_key"] is None or row["observed_key"] < cutoff_key)) or (end is not None and (observed_at is None or observed_at >= end)):
                     continue
-                row["uncertain"] = bool(row["counter_provenance"] == "legacy_delta" and (
-                    (cutoff_key is not None and (row["prior_key"] is None or row["prior_key"] < cutoff_key)) or
-                    (request.start_date is not None and (row["prior"] is None or row["prior"].date() < request.start_date))))
                 window.append(row)
-            included = {row["execution_id"] for row in window if row["execution_id"]}
-            overlapping = set()
-            for execution_id in included:
-                ancestor = parents.get(execution_id)
-                seen = {execution_id}
-                while ancestor and ancestor not in seen:
-                    if ancestor in included:
-                        overlapping.add(ancestor)
-                    seen.add(ancestor)
-                    ancestor = parents.get(ancestor)
-            excluded = [row for row in window if row["execution_id"] in overlapping
-                        and row["counter_provenance"] == "legacy_delta"]
-            if excluded:
-                window = [row for row in window if row not in excluded]
             scoped_diagnostics = [item for item in diagnostics if _diagnostic_matches(item, request)
                                   and (cutoff_key is None or not item.get("observed_at")
                                        or (_instant(item["observed_at"]) is not None
                                            and _instant(item["observed_at"]) >= cutoff_key))]
-            scoped_diagnostics += ([{"message": "Overlapping legacy agent counters withheld."}] if excluded else [])
             summary = _measure(window, scope, display_start, effective_end, diagnostics=scoped_diagnostics, empty=empty)
             if not empty:
                 summary = replace(summary, turn_throughput=_turn_throughput(

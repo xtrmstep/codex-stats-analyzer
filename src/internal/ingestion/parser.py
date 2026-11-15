@@ -93,11 +93,7 @@ def _normalize(raw: dict[str, Any], session_id: str, source: Path, line: int, re
     context = payload if kind in {"session_meta", "turn_context"} else {}
     token_counters = None
     if kind == "token_usage_record":
-        token_counters = {key: payload[key] for key in ("usage", "turn_token_usage", "thread_token_usage") if isinstance(payload.get(key), dict)} or None
-    elif kind == "event_msg" and subtype == "token_count":
-        info = payload.get("info")
-        if isinstance(info, dict):
-            token_counters = {key: info[key] for key in ("total_token_usage", "last_token_usage") if isinstance(info.get(key), dict)} or None
+        token_counters = {"usage": payload["usage"]} if isinstance(payload.get("usage"), dict) else None
     evidence = None
     if kind == "event_msg" and subtype in {"task_started", "task_complete", "turn_aborted"}:
         evidence = {"type": subtype}

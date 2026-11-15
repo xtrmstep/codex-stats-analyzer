@@ -137,7 +137,7 @@ def render_statistics(calculator, selection, marker, project_keys, selected_agen
         extra_columns[3].metric("Non-cached input", _number(summary.totals["non_cached_input_tokens"]),
                                 help="Input minus cached input where both counts are known.")
         st.caption(f"Agent threads: {summary.agents:,}")
-        st.caption("Legacy intervals crossing a boundary and potentially overlapping agent counters can make coverage partial.")
+        st.caption("Missing, conflicting, or incomplete response usage can make coverage partial.")
         sections = (
             ("Token consumption over time", (
                 ("Project over time", "Project over time", "Project"),

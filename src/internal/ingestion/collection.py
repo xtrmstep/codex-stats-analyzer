@@ -54,7 +54,7 @@ class DatabaseWriter:
     def _initialize_schema(self) -> None:
         with self.transaction():
             version = self.connection.execute("PRAGMA user_version").fetchone()[0]
-            if version > 9:
+            if version > 10:
                 raise ValueError(f"Unsupported database schema version: {version}")
             if version == 0:
                 self.connection.execute("CREATE TABLE IF NOT EXISTS logs (log_identity TEXT PRIMARY KEY)")
@@ -141,6 +141,25 @@ class DatabaseWriter:
                 self.connection.execute("ALTER TABLE source_paths ADD COLUMN file_size INTEGER")
                 self.connection.execute("ALTER TABLE source_paths ADD COLUMN mtime_ns INTEGER")
                 self.connection.execute("PRAGMA user_version = 9")
+                version = 9
+            if version == 9:
+                self.connection.execute("DROP TABLE usage_records")
+                self.connection.execute(
+                    "CREATE TABLE usage_records ("
+                    "usage_id TEXT PRIMARY KEY, source_record_id TEXT NOT NULL REFERENCES collected_records(record_id), "
+                    "execution_id TEXT REFERENCES agent_threads(execution_id), observed_at TEXT, "
+                    "source_working_directory TEXT, project_key TEXT, project_label TEXT, model TEXT, "
+                    "input_tokens INTEGER, output_tokens INTEGER, cached_input_tokens INTEGER, "
+                    "cache_write_input_tokens INTEGER, reasoning_output_tokens INTEGER, total_tokens INTEGER, "
+                    "non_cached_input_tokens INTEGER, coverage TEXT NOT NULL)"
+                )
+                self.connection.execute("UPDATE import_state SET initialized = 0, needs_rebuild = 1")
+                if self.connection.execute("SELECT EXISTS(SELECT 1 FROM collected_records)").fetchone()[0]:
+                    self.connection.execute(
+                        "INSERT INTO import_state (id, initialized, needs_rebuild) VALUES (1, 0, 1) "
+                        "ON CONFLICT(id) DO NOTHING"
+                    )
+                self.connection.execute("PRAGMA user_version = 10")
 
     @contextmanager
     def transaction(self):

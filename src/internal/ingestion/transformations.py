@@ -8,7 +8,7 @@ import json
 import ntpath
 import re
 
-from internal.analytics.token_accounting import _timestamp, calculate_increments, calculate_response_usage
+from internal.analytics.token_accounting import _timestamp, calculate_response_usage
 from internal.ingestion.parser import parse_collected
 
 
@@ -28,13 +28,12 @@ class CodexAgentThread:
 
 @dataclass(frozen=True)
 class CodexUsage:
-    """A response or counter delta tied to its collected evidence."""
+    """A response tied to its collected evidence."""
 
     usage_id: str
     source_record_id: str
     execution_id: str | None
     observed_at: str | None
-    prior_observed_at: str | None
     source_working_directory: str | None
     project_key: str | None
     project_label: str | None
@@ -47,7 +46,6 @@ class CodexUsage:
     total_tokens: int | None
     non_cached_input_tokens: int | None
     coverage: str
-    counter_provenance: str
 
 
 class CodexRecordTransformation(ABC):
@@ -275,7 +273,7 @@ def _project(directory, repository_url):
 
 
 class UsageTransformation(CodexRecordTransformation):
-    """Calculate deduplicated response usage and conservative legacy deltas."""
+    """Calculate deduplicated response usage."""
 
     record_type = CodexUsage
     destination = ("usage_records", {name: name for name in CodexUsage.__dataclass_fields__})
@@ -392,79 +390,11 @@ class UsageTransformation(CodexRecordTransformation):
                 context.get("directory"), context.get("repository_url")
             )
             rows.append(CodexUsage(hashlib.sha256(json.dumps([thread, response]).encode()).hexdigest(),
-                                   event.record_id, execution_id, _valid_timestamp(event.timestamp) if len(timestamps) == 1 else None, None,
+                                   event.record_id, execution_id, _valid_timestamp(event.timestamp) if len(timestamps) == 1 else None,
                                    context.get("directory"), project_key, project_label, context.get("model"),
-                                   **values, coverage="complete" if complete else "partial", counter_provenance="response"))
+                                   **values, coverage="complete" if complete else "partial"))
 
         record_logs = {record.record_id: record.log_identity for record in records}
-        owner_logs = {}
-        response_times = {}
-        for event in events:
-            if event.thread_id:
-                owner = (event.session_id, event.thread_id)
-                owner_logs.setdefault(owner, set()).add(record_logs[event.record_id])
-                if isinstance((event.token_counters or {}).get("usage"), dict):
-                    timestamp = _valid_timestamp(event.timestamp)
-                    response_times.setdefault(owner, []).append(
-                        _timestamp(timestamp)
-                    )
-        legacy_events = []
-        originals = {}
-        response_started = set()
-        for event in events:
-            if not event.thread_id:
-                if event.token_counters:
-                    diagnostics.append({"source_record_id": event.record_id, "execution_id": None,
-                                        "observed_at": _valid_timestamp(event.timestamp), "message": "Token owner is unknown; usage withheld."})
-                continue
-            if len(sessions_by_thread[event.thread_id]) != 1:
-                if event.token_counters and not isinstance(event.token_counters.get("usage"), dict):
-                    diagnostics.append({"source_record_id": event.record_id, "execution_id": None,
-                                        "observed_at": _valid_timestamp(event.timestamp), "message": "Thread has conflicting session identities; legacy usage withheld."})
-                continue
-            owner = (event.session_id, event.thread_id)
-            if len(owner_logs[owner]) > 1:
-                if event.token_counters and not isinstance(event.token_counters.get("usage"), dict):
-                    execution_id = _execution_id(*owner)
-                    partial_owners.add(execution_id)
-                    diagnostics.append({"source_record_id": event.record_id, "execution_id": execution_id,
-                                        "observed_at": _valid_timestamp(event.timestamp), "message": "Legacy counters span multiple source logs; overlap is unknown."})
-                continue
-            if isinstance((event.token_counters or {}).get("usage"), dict):
-                response_started.add(owner)
-            if owner in response_started:
-                continue
-            if event.token_counters and owner in response_times:
-                timestamp = _valid_timestamp(event.timestamp)
-                observed = _timestamp(timestamp)
-                times = response_times[owner]
-                if observed is None or any(value is None or observed >= value for value in times):
-                    execution_id = _execution_id(*owner)
-                    partial_owners.add(execution_id)
-                    diagnostics.append({"source_record_id": event.record_id, "execution_id": execution_id,
-                                        "observed_at": timestamp, "message": "Legacy and response scopes cannot be ordered reliably."})
-                    continue
-            execution_id = _execution_id(event.session_id, event.thread_id)
-            context = event_context.get(event.record_id, {})
-            legacy_events.append(replace(event, reference=event.record_id, session_id=execution_id, model=context.get("model")))
-            originals[event.record_id] = event
-        accounting = calculate_increments(legacy_events)
-        for message in accounting.diagnostics:
-            diagnostics.append({"source_record_id": None, "execution_id": None, "observed_at": None, "message": message})
-        previous = {}
-        for increment in accounting.increments:
-            event = originals[increment.reference]
-            context = event_context.get(event.record_id, {})
-            project_key, project_label = (None, None) if context.get("project_conflict") else _project(
-                context.get("directory"), context.get("repository_url")
-            )
-            values = {name: increment.values.get(name) for name in CodexUsage.__dataclass_fields__
-                      if name.endswith("_tokens")}
-            rows.append(CodexUsage(event.record_id, event.record_id, increment.session_id, _valid_timestamp(event.timestamp),
-                                   previous.get(increment.session_id), context.get("directory"), project_key,
-                                   project_label, increment.model, **values,
-                                   coverage="complete" if increment.complete else "partial", counter_provenance="legacy_delta"))
-            previous[increment.session_id] = _valid_timestamp(event.timestamp)
         affected_logs = {record_logs[item["source_record_id"]] for item in diagnostics
                          if item["source_record_id"] in record_logs}
         rows = [replace(row, coverage="partial")
