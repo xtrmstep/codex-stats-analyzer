@@ -276,10 +276,12 @@ class ModelUsageCalculator(UsageCalculator):
         return None, row["model"], None
 
 
-def _turn_throughput(events, threads, all_rows, window, request, cutoff_key, end):
-    """Calculate throughput only for complete, independently counted turns."""
+def _index_turn_events(events, threads):
+    """Index lifecycle events and response observations by verified turn."""
     owners = {(row["session_id"], row["thread_id"]): row["execution_id"] for row in threads}
-    lifecycle, responses, response_turns = {}, {}, {}
+    lifecycle = {}
+    responses = {}
+    response_turns = {}
     for event in events:
         owner = owners.get((event.session_id, event.thread_id)) if event.thread_id else None
         if owner is None or not event.turn_id:
@@ -287,63 +289,108 @@ def _turn_throughput(events, threads, all_rows, window, request, cutoff_key, end
         turn = (owner, event.turn_id)
         if event.event_type in {"event_msg.task_started", "event_msg.task_complete", "event_msg.turn_aborted"}:
             lifecycle.setdefault(turn, []).append(event)
+
         usage = (event.token_counters or {}).get("usage")
         if isinstance(usage, dict):
-            responses.setdefault(turn, []).append(event)
+            responses.setdefault(turn, {}).setdefault(event.response_id, []).append(event)
             if event.response_id:
                 response_turns.setdefault((owner, event.response_id), set()).add(event.turn_id)
+    return lifecycle, responses, response_turns
+
+
+def _turn_duration_in_window(timing, request, cutoff_key, end):
+    """Return the recorded duration in milliseconds for an eligible turn."""
+    starts = [event for event in timing if event.event_type == "event_msg.task_started"]
+    completions = [event for event in timing if event.event_type == "event_msg.task_complete"]
+    if not starts or not completions:
+        return None
+    if any(event.event_type == "event_msg.turn_aborted" for event in timing):
+        return None
+    if any((event.evidence or {}).get("failed") is not False for event in completions):
+        return None
+
+    try:
+        start_times = {_timestamp(event.timestamp) for event in starts}
+        end_times = {_timestamp(event.timestamp) for event in completions}
+        durations = {(event.evidence or {}).get("duration_ms") for event in completions}
+        if any(len(values) != 1 or None in values for values in (start_times, end_times, durations)):
+            return None
+
+        start_time, = start_times
+        finish_time, = end_times
+        duration_ms, = durations
+        if duration_ms <= 0 or finish_time < start_time:
+            return None
+
+        for stamp in (start_time, finish_time):
+            if not _date_matches(stamp, request):
+                return None
+            if cutoff_key is not None and _instant(stamp.isoformat()) < cutoff_key:
+                return None
+            if end is not None and stamp >= end:
+                return None
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+    return duration_ms
+
+
+def _turn_output_tokens(owner, responses, response_turns, rows_by_record, window_ids):
+    """Return the output total when each observed response is verified in scope."""
+    if not responses:
+        return None
+
+    output_tokens = 0
+    for response_id, observations in responses.items():
+        if not response_id or len(response_turns[(owner, response_id)]) != 1:
+            return None
+
+        signatures = {json.dumps(event.token_counters["usage"], sort_keys=True) for event in observations}
+        if len(signatures) != 1:
+            return None
+
+        candidates = {}
+        for event in observations:
+            row = rows_by_record.get(event.record_id)
+            if row is not None:
+                candidates[row["usage_id"]] = row
+        if len(candidates) != 1:
+            return None
+
+        row, = candidates.values()
+        if row["execution_id"] != owner or row["usage_id"] not in window_ids:
+            return None
+        if row["coverage"] != "complete" or row["output_tokens"] is None:
+            return None
+        output_tokens += row["output_tokens"]
+
+    return output_tokens
+
+
+def _turn_throughput(events, threads, all_rows, window, request, cutoff_key, end):
+    """Return output tokens per second across complete turns in the window."""
+    lifecycle, responses, response_turns = _index_turn_events(events, threads)
 
     rows_by_record = {row["source_record_id"]: row for row in all_rows
                       if row["counter_provenance"] == "response"}
     window_ids = {row["usage_id"] for row in window}
-    output_sum = duration_sum = 0
+
+    output_sum = 0
+    duration_sum_ms = 0
     for turn, timing in lifecycle.items():
-        starts = [event for event in timing if event.event_type == "event_msg.task_started"]
-        completions = [event for event in timing if event.event_type == "event_msg.task_complete"]
-        if not starts or not completions or any(event.event_type == "event_msg.turn_aborted" for event in timing):
-            continue
-        try:
-            start_times = {_timestamp(event.timestamp) for event in starts}
-            end_times = {_timestamp(event.timestamp) for event in completions}
-            durations = {(event.evidence or {}).get("duration_ms") for event in completions}
-            if (len(start_times) != 1 or len(end_times) != 1 or None in start_times or None in end_times
-                    or len(durations) != 1 or None in durations
-                    or any((event.evidence or {}).get("failed") is not False for event in completions)):
-                continue
-            start_time, finish_time, duration = next(iter(start_times)), next(iter(end_times)), next(iter(durations))
-            if duration <= 0 or finish_time < start_time:
-                continue
-            if any(not _date_matches(stamp, request) or
-                   (cutoff_key is not None and _instant(stamp.isoformat()) < cutoff_key) or
-                   (end is not None and stamp >= end) for stamp in (start_time, finish_time)):
-                continue
-        except (TypeError, ValueError, OverflowError):
+        duration_ms = _turn_duration_in_window(timing, request, cutoff_key, end)
+        if duration_ms is None:
             continue
 
-        observations = responses.get(turn, [])
-        if not observations or any(not event.response_id for event in observations):
+        owner, _ = turn
+        output_tokens = _turn_output_tokens(owner, responses.get(turn), response_turns, rows_by_record, window_ids)
+        if output_tokens is None:
             continue
-        grouped = {}
-        for event in observations:
-            grouped.setdefault(event.response_id, []).append(event)
-        matched = []
-        for response_id, duplicates in grouped.items():
-            if len(response_turns[(turn[0], response_id)]) != 1:
-                break
-            signatures = {json.dumps(event.token_counters["usage"], sort_keys=True) for event in duplicates}
-            candidates = {rows_by_record[event.record_id]["usage_id"]: rows_by_record[event.record_id]
-                          for event in duplicates if event.record_id in rows_by_record}
-            if len(signatures) != 1 or len(candidates) != 1:
-                break
-            row = next(iter(candidates.values()))
-            if (row["execution_id"] != turn[0] or row["usage_id"] not in window_ids
-                    or row["coverage"] != "complete" or row["output_tokens"] is None):
-                break
-            matched.append(row)
-        else:
-            output_sum += sum(row["output_tokens"] for row in matched)
-            duration_sum += duration
-    return output_sum * 1000 / duration_sum if duration_sum else None
+
+        output_sum += output_tokens
+        duration_sum_ms += duration_ms
+
+    return output_sum * 1000 / duration_sum_ms if duration_sum_ms else None
 
 
 class StatsCalculation:
