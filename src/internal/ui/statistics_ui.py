@@ -103,6 +103,39 @@ def _comparison_result(calculator, request, bounds, agents):
     return bounds, summary, groups
 
 
+def _render_chart(groups, title, group_key, series, scope_index, period):
+    """Render one chart or its empty state."""
+    ordered = sorted(groups[group_key], key=lambda item: _measurement_key(item, title))
+    rows = [_row(item, title) for item in ordered]
+    if not rows or not any(row["Total tokens"] is not None for row in rows):
+        st.info("No plottable usage for this chart.")
+        return
+    chart = pd.DataFrame(rows)
+    chart[series] = chart[series].fillna("Unknown")
+    trend = title.endswith("over time")
+    x = "Time" if trend else "Project" if title == "Agent by project" else series
+    kwargs = {}
+    if title == "Agent by project":
+        chart["Project"] = chart["Project"].fillna("Unknown")
+        kwargs["barmode"] = "group"
+    if trend and chart["Time"].isna().any():
+        chart["Time"] = chart["Time"].fillna("Unknown")
+        kwargs["category_orders"] = {"Time": list(dict.fromkeys(chart["Time"]))}
+    elif trend:
+        chart["Time"] = pd.to_datetime(chart["Time"])
+    figure = px.bar(chart, x=x, y="Total tokens", color=series, hover_data=["Coverage"], **kwargs)
+    if trend and "category_orders" in kwargs:
+        figure.update_xaxes(type="category")
+    top_margin = 20
+    height = 300 if trend else 260
+    if not trend and chart[x].astype(str).str.len().max() > 24:
+        height = 310
+    figure.update_layout(height=height, margin=dict(l=20, r=20, t=top_margin, b=35))
+    figure.update_xaxes(automargin=True)
+    figure.update_yaxes(automargin=True)
+    st.plotly_chart(figure, use_container_width=True, key=f"usage_{scope_index}_{period}_{group_key}")
+
+
 def render_statistics(calculator, selection, marker, project_keys, selected_agents, bucket,
                       comparison_bounds=None, comparison_agents=None):
     """Calculate and render each scope's seven usage breakdowns."""
@@ -182,37 +215,24 @@ def render_statistics(calculator, selection, marker, project_keys, selected_agen
                 ("By agent", "By agent", "Agent"),
                 ("Agent by project", "Agent by project", "Agent"))),
         )
+        if scope == "Full selected period" and comparison is not None:
+            left, right = st.columns(2)
+            with left:
+                st.markdown("**Selected period**")
+                st.caption(f"{selection.start_date} to {selection.end_date} (inclusive)")
+            with right:
+                st.markdown("**Previous period**")
+                st.caption(f"{comparison[0][0]} to {comparison[0][1]} (inclusive)")
         for section, charts in sections:
             st.subheader(section)
             for title, group_key, series in charts:
                 heading = f"By {series}" if title.endswith("over time") else title
                 st.markdown(f"##### {heading}")
-                ordered = sorted(groups[group_key], key=lambda item: _measurement_key(item, title))
-                rows = [_row(item, title) for item in ordered]
-                if not rows or not any(row["Total tokens"] is not None for row in rows):
-                    st.info("No plottable usage for this chart.")
-                    continue
-                chart = pd.DataFrame(rows)
-                chart[series] = chart[series].fillna("Unknown")
-                trend = title.endswith("over time")
-                x = "Time" if trend else "Project" if title == "Agent by project" else series
-                kwargs = {}
-                if title == "Agent by project":
-                    chart["Project"] = chart["Project"].fillna("Unknown")
-                    kwargs["barmode"] = "group"
-                if trend and chart["Time"].isna().any():
-                    chart["Time"] = chart["Time"].fillna("Unknown")
-                    kwargs["category_orders"] = {"Time": list(dict.fromkeys(chart["Time"]))}
-                elif trend:
-                    chart["Time"] = pd.to_datetime(chart["Time"])
-                figure = px.bar(chart, x=x, y="Total tokens", color=series, hover_data=["Coverage"], **kwargs)
-                if trend and "category_orders" in kwargs:
-                    figure.update_xaxes(type="category")
-                top_margin = 20
-                height = 300 if trend else 260
-                if not trend and chart[x].astype(str).str.len().max() > 24:
-                    height = 310
-                figure.update_layout(height=height, margin=dict(l=20, r=20, t=top_margin, b=35))
-                figure.update_xaxes(automargin=True)
-                figure.update_yaxes(automargin=True)
-                st.plotly_chart(figure, use_container_width=True, key=f"usage_{scope_index}_{group_key}")
+                if scope == "Full selected period" and comparison is not None:
+                    left, right = st.columns(2)
+                    with left:
+                        _render_chart(groups, title, group_key, series, scope_index, "selected")
+                    with right:
+                        _render_chart(comparison[2], title, group_key, series, scope_index, "previous")
+                else:
+                    _render_chart(groups, title, group_key, series, scope_index, "selected")

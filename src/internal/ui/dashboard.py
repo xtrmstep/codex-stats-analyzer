@@ -110,6 +110,7 @@ def _render(sources, writer, page):
                               format_func=date_label, key="overview_date_range")
         start, end = limits[preset]
         bucket = st.radio("Time aggregation", ["hourly", "daily", "weekly", "monthly"], index=1, horizontal=True)
+        compare = st.checkbox("Compare to previous period", value=False, disabled=start is None)
 
     filters = st.sidebar.expander("Filters", expanded=True)
     with filters:
@@ -187,7 +188,9 @@ def _render(sources, writer, page):
         selected = selected.loc[[pair in chosen_pairs for pair in zip(selected["session"], selected["agent"])]].copy()
     render_statistics(
         report_calculator, selection, marker, project_keys, selected_agents, bucket,
-        comparison_agents=_comparison_execution_ids(report_calculator.threads, selected_chat, selected_agent),
+        comparison_bounds=_previous_period(start, end) if compare and start is not None else None,
+        comparison_agents=(_comparison_execution_ids(report_calculator.threads, selected_chat, selected_agent)
+                           if compare and start is not None else None),
     )
     if selected.empty:
         st.info("No observed events match the selected filters.")
