@@ -66,17 +66,13 @@ def _render(sources, writer, page):
         agent_name_editor(writer)
         return
 
-    filters = st.sidebar.container()
-    with filters:
-        st.subheader("Filters")
-    configuration = st.container()
-    with configuration:
-        refresh_columns = st.columns(2)
-        incremental_requested = refresh_columns[0].button("Incremental refresh")
-        full_requested = refresh_columns[1].button(
-            "Full refresh from source",
-            help="Replaces imported history with available source logs; saved markers and agent names are kept.",
-        )
+    refresh_columns = st.columns(2)
+    incremental_requested = refresh_columns[0].button("Incremental refresh")
+    full_requested = refresh_columns[1].button(
+        "Full refresh from source",
+        help="Replaces imported history with available source logs; saved markers and agent names are kept.",
+    )
+    with st.sidebar:
         st.subheader("Overview configuration")
         presets = ["Today", "All Time", "Current week", "Last week", "Current month", "Last month"]
         today = date.today()
@@ -93,7 +89,9 @@ def _render(sources, writer, page):
         start, end = limits[preset]
         bucket = st.radio("Time aggregation", ["hourly", "daily", "weekly", "monthly"], index=1, horizontal=True)
 
+    filters = st.sidebar.container()
     with filters:
+        st.subheader("Filters")
         marker = marker_selector(writer)
 
     reader = CodexLogReader()
