@@ -67,6 +67,8 @@ When a comparison is active, show the selected-period charts on the left and the
 
 All seven charts use the same filtered usage and display total tokens. The trend charts use the selected time aggregation and show buckets from oldest to newest by recorded clock time. An unknown bucket appears after dated buckets when present. The three summaries aggregate the entire reporting window and keep the same totals when time aggregation changes. Show a readable unknown attribution label where applicable and distinguish unknown token counts from zero.
 
+Use the [short project labels](./010-navigation.md#project-labels) wherever charts name a project, including axes, legends, facets, and hover text. Continue grouping usage by its project identity.
+
 Group agent charts by reporting name. Use the user-assigned name if present, otherwise the recorded name, then the recorded role, then **Default**. The [sidebar Agent filter](./010-navigation.md#15-filters) uses the same reporting name.
 
 Use an empty state for a chart without plottable totals and retain the reporting window's empty-range state. Within each trend breakdown, order data by time bucket and then group name. Order summary categories by group name.

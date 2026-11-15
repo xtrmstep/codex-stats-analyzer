@@ -54,10 +54,17 @@ These remain open for later UI specification work.
 
 On Overview, show one collapsible **Filters** section below [Overview configuration](#16-overview-configuration). Start it expanded. Collapsing it hides the controls and keeps their selections active. It contains project, model, observed agent role, chat, agent name, and execution mode.
 
+- **Projects** displays the [short project labels](#project-labels) in its options and selected values.
 - **Chat** lists distinct known titles available for the selected dates and other applicable filters. It defaults to **All chats** and returns to that value if the selected title becomes unavailable. A selected title includes the main agent and all subagents that have inherited that title from their verified root. If several chats share the same title, the option includes all of them. Usage from untitled chats remains available under **All chats**.
 - **Agent** lists distinct agent and subagent names and defaults to **All agents**. Use the [reporting name](./030-content.md#3222-trends-and-charts) for each execution. With **All chats**, a selected name matches executions across chats. A selected chat title narrows the available agent names and the results. Keep a selected agent name while it remains available and reset to **All agents** when it becomes unavailable. **Agent roles** filters by observed role and combines with both selections.
 
 The filters determine which records contribute to both the selected-period and comparison results.
+
+### Project labels
+
+Use the repository name or the last named component of the working path as the short label. Support HTTPS and SSH remotes, SCP-style remotes, and Windows, UNC, and POSIX paths. Ignore trailing separators and omit the repository's `.git` suffix. For duplicate labels, add the shortest distinguishing qualifier. Use one label per project across Overview, including both sides of a comparison.
+
+Show a collapsed **Project details** section below **Projects**. List all known projects in a table with **Short label** and **Full project identifier** columns. The full identifier is the repository URL or the working path. This is the only place that displays full identifiers. Use **Unknown** in charts for unattributed usage and keep it distinct from named projects.
 
 ## 1.6 Overview configuration
 
