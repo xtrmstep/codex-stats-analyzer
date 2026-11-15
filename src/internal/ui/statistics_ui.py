@@ -1,5 +1,6 @@
 """Streamlit controls and tables for committed usage measurements."""
 
+from dataclasses import replace
 from datetime import datetime
 
 import pandas as pd
@@ -79,7 +80,18 @@ def _measurement_key(measurement, view):
     return _name_key(measurement.agent)
 
 
-def render_statistics(calculator, selection, marker, project_keys, selected_agents, bucket):
+def _comparison_result(calculator, request, bounds, agents):
+    """Calculate the preceding period without applying the saved marker."""
+    if bounds is None:
+        return None
+    comparison_request = replace(request, start_date=bounds[0], end_date=bounds[1],
+                                 agents=agents, marker=None)
+    summary, groups = calculator.calculate(comparison_request)["Full selected period"]
+    return bounds, summary, groups
+
+
+def render_statistics(calculator, selection, marker, project_keys, selected_agents, bucket,
+                      comparison_bounds=None, comparison_agents=None):
     """Calculate and render each scope's seven usage breakdowns."""
     request = StatsRequest(start_date=selection.start_date, end_date=selection.end_date,
                            bucket=bucket,
@@ -87,6 +99,7 @@ def render_statistics(calculator, selection, marker, project_keys, selected_agen
                            roles=selection.agent_roles,
                            agents=selected_agents)
     result = calculator.calculate(request)
+    comparison = _comparison_result(calculator, request, comparison_bounds, comparison_agents)
     for scope_index, (scope, (summary, groups)) in enumerate(result.items()):
         if scope != "Full selected period":
             st.subheader(scope)

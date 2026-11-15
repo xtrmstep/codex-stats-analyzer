@@ -48,6 +48,24 @@ def _date_limits(preset, today):
     }[preset]
 
 
+def _previous_period(start, end):
+    """Return the preceding equally long inclusive date range, if bounded."""
+    if start is None or end is None:
+        return None
+    return start - timedelta(days=(end - start).days + 1), start - timedelta(days=1)
+
+
+def _comparison_execution_ids(threads, selected_chat, selected_agent):
+    """Match active chat and agent selections across the full snapshot."""
+    if selected_chat is None and selected_agent is None:
+        return None
+    return frozenset(
+        row["execution_id"] for row in threads
+        if (selected_chat is None or row["chat_title"] == selected_chat)
+        and (selected_agent is None or reporting_agent_name(row) == selected_agent)
+    )
+
+
 def render(sources):
     """Render the overview and selected session from local read-only sources."""
     page = st.sidebar.radio("Navigation", ["Overview", "Manual annotations"])
@@ -168,7 +186,8 @@ def _render(sources, writer, page):
         chosen_pairs = {(row["session_id"], row["thread_id"]) for row in chosen_threads}
         selected = selected.loc[[pair in chosen_pairs for pair in zip(selected["session"], selected["agent"])]].copy()
     render_statistics(
-        report_calculator, selection, marker, project_keys, selected_agents, bucket
+        report_calculator, selection, marker, project_keys, selected_agents, bucket,
+        comparison_agents=_comparison_execution_ids(report_calculator.threads, selected_chat, selected_agent),
     )
     if selected.empty:
         st.info("No observed events match the selected filters.")
