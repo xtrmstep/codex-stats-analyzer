@@ -6,7 +6,6 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from internal.ui.exports import csv_bytes
 from internal.analytics.usage_statistics import StatsRequest, delete_marker, list_markers, save_marker
 
 
@@ -51,28 +50,14 @@ def _number(value, suffix=""):
     return (f"{value:,.1f}" if isinstance(value, float) else f"{value:,}") + suffix
 
 
-def _row(measurement, view=None):
+def _row(measurement, view):
     return {
-        "Measurement": view or "Summary",
-        "Scope": measurement.scope,
-        "Start": measurement.start.isoformat() if measurement.start is not None else None,
-        "End": measurement.end.isoformat() if measurement.end is not None else None,
         "Project": measurement.project,
         "Agent": (measurement.agent or "Default") if view in {"Agent over time", "Agent by project over time", "By agent"} else None,
         "Model": measurement.agent if view in {"Model over time", "By model"} else None,
         "Time": measurement.bucket.isoformat() if measurement.bucket is not None else None,
         "Total tokens": measurement.totals["total_tokens"],
-        "Input tokens": measurement.totals["input_tokens"],
-        "Output tokens": measurement.totals["output_tokens"],
-        "Cached input": measurement.totals["cached_input_tokens"],
-        "Non-cached input": measurement.totals["non_cached_input_tokens"],
-        "Cache-write input": measurement.totals["cache_write_input_tokens"],
-        "Reasoning output": measurement.totals["reasoning_output_tokens"],
-        "Cache %": measurement.cache_percentage,
-        "Daily average": measurement.average_daily_tokens,
         "Coverage": measurement.coverage,
-        "Agents": measurement.agents,
-        "Empty window": measurement.empty_window,
     }
 
 
@@ -102,12 +87,10 @@ def render_statistics(calculator, selection, marker, project_keys, selected_agen
                            roles=selection.agent_roles,
                            agents=selected_agents)
     result = calculator.calculate(request)
-    export_rows = []
     for scope_index, (scope, (summary, groups)) in enumerate(result.items()):
         st.subheader(scope)
         if marker and scope != "Full selected period":
             st.caption(f"Marker: {marker.timestamp}")
-        export_rows.append(_row(summary))
         if summary.empty_window:
             st.info("No time in range")
             continue
@@ -150,7 +133,6 @@ def render_statistics(calculator, selection, marker, project_keys, selected_agen
                 st.markdown(f"#### {title}")
                 ordered = sorted(groups[group_key], key=lambda item: _measurement_key(item, title))
                 rows = [_row(item, title) for item in ordered]
-                export_rows.extend(rows)
                 if not rows or not any(row["Total tokens"] is not None for row in rows):
                     st.info("No plottable usage for this chart.")
                     continue
@@ -171,8 +153,3 @@ def render_statistics(calculator, selection, marker, project_keys, selected_agen
                 if trend and "category_orders" in kwargs:
                     figure.update_xaxes(type="category")
                 st.plotly_chart(figure, use_container_width=True, key=f"usage_{scope_index}_{group_key}")
-    columns = {name: name.lower().replace(" ", "_").replace("%", "percentage") for name in
-               ("Measurement", "Scope", "Start", "End", "Project", "Agent", "Model", "Time", "Total tokens", "Input tokens",
-                "Output tokens", "Cached input", "Non-cached input", "Cache-write input", "Reasoning output",
-                "Cache %", "Daily average", "Coverage", "Agents", "Empty window")}
-    st.download_button("Download usage CSV", csv_bytes(export_rows, columns), file_name="usage.csv", mime="text/csv")

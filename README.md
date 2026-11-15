@@ -24,11 +24,9 @@ Use **Incremental refresh** to collect new source data while retaining previousl
 
 Token totals use independently attributable per-response usage in `token_usage_record`; cumulative and rollup counters are not counted. Session metadata, turn context, and response items provide attribution and timing context. Explicit nested `source.subagent.thread_spawn` metadata and correlated `spawn_agent` tool results can provide relationships. Only supported explicit skill events are treated as skill evidence; ordinary conversation mentions are not. Unknown event shapes and unresolved links remain visible as diagnostics or unknown values. Not all Codex event variants are supported.
 
-## Filters and exports
+## Filters
 
 Overview filters intersect across recorded date, project, model, role and agent. Date ranges use inclusive recorded calendar days; time buckets use recorded clock labels, with weeks starting Monday. Session and thread identities remain internal to attribution and traceability. Missing fields are excluded when their dimension is filtered.
-
-Download the displayed usage report as CSV. Files use UTF-8 with BOM, standard CSV quoting, blank unknown values and recorded ISO 8601 timestamps with their offsets where provided. Coverage identifies partial and estimated values.
 
 ## Local data and recovery
 
