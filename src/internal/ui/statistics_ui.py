@@ -113,8 +113,24 @@ def render_statistics(calculator, selection, marker, project_keys, selected_agen
             ("Daily average", _number(summary.average_daily_tokens),
              "`Total tokens ÷ reporting window duration in days`"),
         ]
-        st.markdown("| Name | Value | Description |\n| --- | --- | --- |\n" +
-                    "\n".join(f"| {name} | {value} | {description} |" for name, value, description in kpis))
+        table_key = f"overview_kpis_{scope_index}"
+        with st.container(key=table_key):
+            st.markdown(f"""
+                <style>
+                .st-key-{table_key} table {{ width: 100%; table-layout: fixed; font-size: 14px; }}
+                .st-key-{table_key} th, .st-key-{table_key} td {{
+                    padding: 0.2rem 0.4rem; white-space: normal; overflow-wrap: anywhere;
+                }}
+                .st-key-{table_key} th:nth-child(1) {{ width: 24%; }}
+                .st-key-{table_key} th:nth-child(2) {{ width: 16%; }}
+                .st-key-{table_key} th:nth-child(2), .st-key-{table_key} td:nth-child(2) {{ text-align: right; }}
+                .st-key-{table_key} code {{
+                    font-size: 14px; white-space: normal; overflow-wrap: anywhere;
+                }}
+                </style>
+            """, unsafe_allow_html=True)
+            st.markdown("| Name | Value | Description |\n| --- | --- | --- |\n" +
+                        "\n".join(f"| {name} | {value} | {description} |" for name, value, description in kpis))
         st.caption(f"Agent threads: {summary.agents:,}")
         st.caption("Missing, conflicting, or incomplete response usage can make coverage partial.")
         sections = (
