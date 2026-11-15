@@ -209,6 +209,7 @@ def _render(sources, writer, page):
         comparison_bounds=_previous_period(start, end) if compare and start is not None else None,
         comparison_agents=(_comparison_execution_ids(report_calculator.threads, selected_chat, selected_agent)
                            if compare or marker is not None else None),
+        project_labels=labels,
     )
     if selected.empty:
         st.info("No observed events match the selected filters.")

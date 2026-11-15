@@ -120,9 +120,14 @@ def _kpi_values(summary):
     ]
 
 
-def _row(measurement, view):
+def _project_label(project, labels):
+    """Return a project's shared display label, or the unknown label."""
+    return labels[project].label if project in labels else "Unknown"
+
+
+def _row(measurement, view, project_labels):
     return {
-        "Project": measurement.project,
+        "Project": _project_label(measurement.project, project_labels),
         "Agent": (measurement.agent or "Default") if view in {"Agent over time", "Agent by project", "By agent"} else None,
         "Model": measurement.agent if view in {"Model over time", "By model"} else None,
         "Time": measurement.bucket.isoformat() if measurement.bucket is not None else None,
@@ -137,15 +142,16 @@ def _name_key(name):
     return name.casefold(), name
 
 
-def _measurement_key(measurement, view):
+def _measurement_key(measurement, view, project_labels):
     """Return the prescribed ordering key for a breakdown measurement."""
     if view.endswith("over time"):
-        names = _name_key(measurement.project if view == "Project over time" else measurement.agent)
+        names = _name_key(_project_label(measurement.project, project_labels)
+                          if view == "Project over time" else measurement.agent)
         return (measurement.bucket is None, measurement.bucket or pd.Timestamp.max, *names)
     if view == "Agent by project":
-        return _name_key(measurement.project) + _name_key(measurement.agent or "Default")
+        return _name_key(_project_label(measurement.project, project_labels)) + _name_key(measurement.agent or "Default")
     if view == "By project":
-        return _name_key(measurement.project)
+        return _name_key(_project_label(measurement.project, project_labels))
     return _name_key(measurement.agent)
 
 
@@ -163,10 +169,10 @@ def _comparison_result(calculator, request, bounds, agents, marker=None):
     return bounds, summary, groups
 
 
-def _render_chart(groups, title, group_key, series, scope_index, period):
+def _render_chart(groups, title, group_key, series, scope_index, period, project_labels):
     """Render one chart or its empty state."""
-    ordered = sorted(groups[group_key], key=lambda item: _measurement_key(item, title))
-    rows = [_row(item, title) for item in ordered]
+    ordered = sorted(groups[group_key], key=lambda item: _measurement_key(item, title, project_labels))
+    rows = [_row(item, title, project_labels) for item in ordered]
     if not rows or not any(row["Total tokens"] is not None for row in rows):
         st.info("No plottable usage for this chart.")
         return
@@ -197,7 +203,7 @@ def _render_chart(groups, title, group_key, series, scope_index, period):
 
 
 def render_statistics(calculator, selection, marker, project_keys, selected_agents, bucket,
-                      comparison_bounds=None, comparison_agents=None):
+                      comparison_bounds=None, comparison_agents=None, project_labels=None):
     """Calculate and render each scope's seven usage breakdowns."""
     request = StatsRequest(start_date=selection.start_date, end_date=selection.end_date,
                            bucket=bucket,
@@ -205,6 +211,7 @@ def render_statistics(calculator, selection, marker, project_keys, selected_agen
                            roles=selection.agent_roles,
                            agents=selected_agents)
     result = calculator.calculate(request)
+    project_labels = project_labels or {}
     comparison = _comparison_result(calculator, request, comparison_bounds, comparison_agents, marker)
     for scope_index, (scope, (summary, groups)) in enumerate(result.items()):
         if summary.empty_window:
@@ -289,11 +296,11 @@ def render_statistics(calculator, selection, marker, project_keys, selected_agen
                 if scope == "Full selected period" and comparison is not None:
                     left, right = st.columns(2)
                     with left:
-                        _render_chart(groups, title, group_key, series, scope_index, "selected")
+                        _render_chart(groups, title, group_key, series, scope_index, "selected", project_labels)
                     with right:
                         if comparison[1].empty_window:
                             st.info("No time in range")
                         else:
-                            _render_chart(comparison[2], title, group_key, series, scope_index, "previous")
+                            _render_chart(comparison[2], title, group_key, series, scope_index, "previous", project_labels)
                 else:
-                    _render_chart(groups, title, group_key, series, scope_index, "selected")
+                    _render_chart(groups, title, group_key, series, scope_index, "selected", project_labels)
