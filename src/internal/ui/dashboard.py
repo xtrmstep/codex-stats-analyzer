@@ -109,9 +109,11 @@ def _render(sources, writer, page):
                               format_func=date_label, key="overview_date_range")
         start, end = limits[preset]
         bucket = st.radio("Time aggregation", ["hourly", "daily", "weekly", "monthly"], index=1, horizontal=True)
-        compare = st.checkbox("Compare to previous period", value=False, disabled=start is None)
-        compare = compare and start is not None and end is not None
-        marker = marker_selector(writer, disabled=compare)
+        with st.container(border=True):
+            st.markdown("**Period Comparison Configuration**")
+            compare = st.checkbox("Compare to previous period", value=False, disabled=start is None)
+            compare = compare and start is not None and end is not None
+            marker = marker_selector(writer, disabled=compare)
 
     filters = st.sidebar.expander("Filters", expanded=True)
 
