@@ -86,7 +86,11 @@ def _render(sources, writer, page):
 
         preset = st.selectbox("Date range", presets, format_func=date_label, key="overview_date_range")
         start, end = limits[preset]
-        refresh_requested = st.button("Refresh sources")
+        incremental_requested = st.button("Incremental refresh")
+        full_requested = st.button(
+            "Full refresh from source",
+            help="Replaces imported history with available source logs; saved markers and agent names are kept.",
+        )
         bucket = st.radio("Time aggregation", ["hourly", "daily", "weekly", "monthly"], index=1, horizontal=True)
 
     with filters:
@@ -98,17 +102,21 @@ def _render(sources, writer, page):
     initialized = bool(state and state[0])
     needs_rebuild = bool(state and state[1])
     first_attempt = not initialized and not st.session_state.get("initial_import_attempted", False)
-    if first_attempt or refresh_requested:
+    if first_attempt or incremental_requested or full_requested:
         st.session_state["initial_import_attempted"] = True
-        successful, diagnostics = (importer.rebuild() if first_attempt and needs_rebuild and not refresh_requested
-                                   else importer.refresh(sources))
+        if full_requested:
+            successful, diagnostics = importer.full_refresh(sources)
+        elif incremental_requested or not needs_rebuild:
+            successful, diagnostics = importer.refresh(sources)
+        else:
+            successful, diagnostics = importer.rebuild()
         st.session_state["source_diagnostics"] = [(item.source, item.message, item.fatal) for item in diagnostics]
         st.session_state["source_refresh_failed"] = not successful
     for source, message, fatal in st.session_state.get("source_diagnostics", []):
         (st.error if fatal else st.warning)(f"{source}: {message}")
     state = writer.connection.execute("SELECT initialized FROM import_state WHERE id = 1").fetchone()
     if not state or not state[0]:
-        st.warning("No published usage dataset is available. Use Refresh sources to retry.")
+        st.warning("No published usage dataset is available. Use Incremental refresh to retry.")
         return
     if st.session_state.get("source_refresh_failed", False):
         st.warning("Showing the last committed usage dataset.")
