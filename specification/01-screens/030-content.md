@@ -28,7 +28,9 @@ This conceptual layout corresponds to the main content region in [000-main-layou
 
 ### 3.2.1 View Parameters / View Configuration
 
-Show **Date range**, **Refresh sources**, and **Time aggregation**. Time aggregation offers hourly, daily, weekly, and monthly buckets. Overview results use the date range and the [sidebar filters](./010-navigation.md#15-filters).
+Show **Date range**, **Incremental refresh**, **Full refresh from source**, and **Time aggregation**. Time aggregation offers hourly, daily, weekly, and monthly buckets. Overview results use the date range and the [sidebar filters](./010-navigation.md#15-filters).
+
+**Incremental refresh** loads new records and retains imported history. **Full refresh from source** replaces the imported dataset with the source records currently available. Explain beside the full refresh action that previously imported history can disappear and that saved markers and agent names are kept. See [source collection](../02-architecture/02-design/000-system-overview.md#component-behavior).
 
 #### Date range
 
