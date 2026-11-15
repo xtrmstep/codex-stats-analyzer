@@ -54,7 +54,7 @@ class DatabaseWriter:
     def _initialize_schema(self) -> None:
         with self.transaction():
             version = self.connection.execute("PRAGMA user_version").fetchone()[0]
-            if version > 8:
+            if version > 9:
                 raise ValueError(f"Unsupported database schema version: {version}")
             if version == 0:
                 self.connection.execute("CREATE TABLE IF NOT EXISTS logs (log_identity TEXT PRIMARY KEY)")
@@ -136,6 +136,11 @@ class DatabaseWriter:
             if version == 7:
                 self.connection.execute("CREATE TABLE agent_names (execution_id TEXT PRIMARY KEY, name TEXT NOT NULL)")
                 self.connection.execute("PRAGMA user_version = 8")
+                version = 8
+            if version == 8:
+                self.connection.execute("ALTER TABLE source_paths ADD COLUMN file_size INTEGER")
+                self.connection.execute("ALTER TABLE source_paths ADD COLUMN mtime_ns INTEGER")
+                self.connection.execute("PRAGMA user_version = 9")
 
     @contextmanager
     def transaction(self):
@@ -311,8 +316,22 @@ class CodexLogImporter:
         source_path = str(path.resolve())
         connection = self.writer.connection
         warning = None
+        def metadata():
+            try:
+                stat = path.stat()
+                return stat.st_size, stat.st_mtime_ns
+            except OSError:
+                return None
+
+        before = metadata()
+        checkpoint = connection.execute(
+            "SELECT file_size, mtime_ns FROM source_paths WHERE source_path = ?", (source_path,)
+        ).fetchone()
+        if before is not None and checkpoint == before:
+            return None
         with self.writer.transaction():
             lines = [line.original_line_bytes for line in self.reader.read_source(path)]
+            after = metadata()
             existing = connection.execute(
                 "SELECT log_identity FROM source_paths WHERE source_path = ?", (source_path,)
             ).fetchone()
@@ -351,6 +370,9 @@ class CodexLogImporter:
                 self.writer.write("logs", {"log_identity": "log_identity"}, [{"log_identity": log_id}])
             self.writer.write("source_paths", {"source_path": "source_path", "log_identity": "log_identity"},
                               [{"source_path": source_path, "log_identity": log_id}], ("source_path",))
+            if stored != lines:
+                connection.execute("UPDATE source_paths SET file_size = NULL, mtime_ns = NULL "
+                                   "WHERE log_identity = ? AND source_path != ?", (log_id, source_path))
             if stored and stored[-1] != lines[len(stored) - 1]:
                 connection.execute("UPDATE collected_records SET original_line_bytes = ? WHERE log_identity = ? AND line_number = ?",
                                    (lines[len(stored) - 1], log_id, len(stored)))
@@ -360,6 +382,9 @@ class CodexLogImporter:
             columns = ("record_id", "log_identity", "source_path", "line_number", "original_line_bytes", "collected_at")
             self.writer.write("collected_records", {column: column for column in columns},
                               (asdict(record) for record in records))
+            verified = before if before is not None and before == after else (None, None)
+            connection.execute("UPDATE source_paths SET file_size = ?, mtime_ns = ? WHERE source_path = ?",
+                               (*verified, source_path))
         return warning
 
     def _lines(self, log_id: str) -> list[bytes]:
