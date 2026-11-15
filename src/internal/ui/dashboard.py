@@ -8,7 +8,6 @@ import streamlit as st
 from internal.analytics.metrics import Filters, build_dataset, filter_dataset
 from internal.ingestion.collection import CodexLogImporter, CodexLogReader, DatabaseWriter
 from internal.ui.statistics_ui import marker_editor, marker_selector, render_statistics
-from internal.ui.agent_names_ui import agent_name_editor
 from internal.analytics.usage_statistics import StatsCalculation, reporting_agent_name
 
 
@@ -68,7 +67,7 @@ def _comparison_execution_ids(threads, selected_chat, selected_agent):
 
 def render(sources):
     """Render the overview and selected session from local read-only sources."""
-    page = st.sidebar.radio("Navigation", ["Overview", "Manual annotations"])
+    page = st.sidebar.radio("Navigation", ["Overview", "Manual Annotations"])
     try:
         writer = DatabaseWriter()
     except (OSError, sqlite3.Error, ValueError) as exc:
@@ -81,9 +80,9 @@ def render(sources):
 
 
 def _render(sources, writer, page):
-    if page == "Manual annotations":
+    if page == "Manual Annotations":
+        st.header("Manual Annotations")
         marker_editor(writer)
-        agent_name_editor(writer)
         return
 
     refresh_columns = st.columns(2)

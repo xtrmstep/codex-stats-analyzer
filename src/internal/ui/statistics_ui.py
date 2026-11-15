@@ -25,7 +25,15 @@ def marker_editor(writer):
     by_id = {marker.marker_id: marker for marker in markers}
     if "new_marker_default_timestamp" not in st.session_state:
         st.session_state["new_marker_default_timestamp"] = datetime.now().astimezone().isoformat()
-    st.subheader("Saved time markers")
+    if markers:
+        ordered = sorted(markers, key=lambda item: datetime.fromisoformat(item.timestamp))
+        st.dataframe(pd.DataFrame([
+            {"Name": item.name,
+             "Local date and time": datetime.fromisoformat(item.timestamp).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")}
+            for item in ordered
+        ]), hide_index=True, use_container_width=True)
+    else:
+        st.info("No saved time markers")
     choice = st.selectbox("Marker to edit", ["Create new marker"] + list(by_id),
                           format_func=lambda key: by_id[key].name if key in by_id else key)
     selected = by_id.get(choice)
