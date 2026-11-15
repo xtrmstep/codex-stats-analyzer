@@ -5,7 +5,6 @@ import sqlite3
 
 import streamlit as st
 
-from internal.analytics.token_accounting import calculate_increments
 from internal.analytics.metrics import Filters, build_dataset, filter_dataset
 from internal.ingestion.collection import CodexLogImporter, CodexLogReader, DatabaseWriter
 from internal.ui.statistics_ui import marker_editor, marker_selector, render_statistics
@@ -128,8 +127,8 @@ def _render(sources, writer, page):
         return
 
     parsed = report_calculator.parsed
-    accounting = calculate_increments(parsed.events)
-    frame = build_dataset(parsed.events, accounting.increments)
+    frame = build_dataset(parsed.events, [])
+    usage_diagnostics = [item for item in report_calculator.diagnostics if item.get("kind") == "usage"]
     with filters:
         projects = {(row["project_key"], row["source_working_directory"]) for row in report_calculator.rows
                     if row["project_key"] is not None}
@@ -173,10 +172,10 @@ def _render(sources, writer, page):
     )
     if selected.empty:
         st.info("No observed events match the selected filters.")
-    with st.expander(f"Parsing and accounting diagnostics ({len(parsed.diagnostics) + len(accounting.diagnostics)})"):
+    with st.expander(f"Parsing and usage diagnostics ({len(parsed.diagnostics) + len(usage_diagnostics)})"):
         for item in parsed.diagnostics:
             st.write(f"{item.source}:{item.line or '-'} — {item.message}")
-        for item in accounting.diagnostics:
-            st.write(item)
+        for item in usage_diagnostics:
+            st.write(item["message"])
 
 
