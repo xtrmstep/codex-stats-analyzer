@@ -169,7 +169,8 @@ def _comparison_result(calculator, request, bounds, agents, marker=None):
     return bounds, summary, groups
 
 
-def _render_chart(groups, title, group_key, series, scope_index, period, project_labels):
+def _render_chart(groups, title, group_key, series, scope_index, period, project_labels,
+                  *, period_title=None):
     """Render one chart or its empty state."""
     ordered = sorted(groups[group_key], key=lambda item: _measurement_key(item, title, project_labels))
     rows = [_row(item, title, project_labels) for item in ordered]
@@ -196,6 +197,10 @@ def _render_chart(groups, title, group_key, series, scope_index, period, project
     height = 300 if trend else 260
     if not trend and chart[x].astype(str).str.len().max() > 24:
         height = 310
+    if period_title is not None:
+        figure.update_layout(title=dict(text=period_title, x=0.5, xanchor="center", font=dict(size=15)))
+        top_margin += 24
+        height += 24
     figure.update_layout(height=height, margin=dict(l=20, r=20, t=top_margin, b=35))
     figure.update_xaxes(automargin=True)
     figure.update_yaxes(automargin=True)
@@ -296,11 +301,17 @@ def render_statistics(calculator, selection, marker, project_keys, selected_agen
                 if scope == "Full selected period" and comparison is not None:
                     left, right = st.columns(2)
                     with left:
-                        _render_chart(groups, title, group_key, series, scope_index, "selected", project_labels)
+                        _render_chart(
+                            groups, title, group_key, series, scope_index, "selected", project_labels,
+                            period_title="Selected period" if comparison_bounds is not None else None,
+                        )
                     with right:
                         if comparison[1].empty_window:
                             st.info("No time in range")
                         else:
-                            _render_chart(comparison[2], title, group_key, series, scope_index, "previous", project_labels)
+                            _render_chart(
+                                comparison[2], title, group_key, series, scope_index, "previous", project_labels,
+                                period_title="Previous period" if comparison_bounds is not None else None,
+                            )
                 else:
                     _render_chart(groups, title, group_key, series, scope_index, "selected", project_labels)
