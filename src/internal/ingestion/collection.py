@@ -145,12 +145,21 @@ class DatabaseWriter:
     @contextmanager
     def transaction(self):
         """Commit all enclosed writes together or roll them back on failure."""
-        self.connection.execute("BEGIN IMMEDIATE")
+        nested = self.connection.in_transaction
+        savepoint = f"nested_{uuid4().hex}"
+        self.connection.execute(f"SAVEPOINT {savepoint}" if nested else "BEGIN IMMEDIATE")
         try:
             yield
-            self.connection.commit()
+            if nested:
+                self.connection.execute(f"RELEASE SAVEPOINT {savepoint}")
+            else:
+                self.connection.commit()
         except BaseException:
-            self.connection.rollback()
+            if nested:
+                self.connection.execute(f"ROLLBACK TO SAVEPOINT {savepoint}")
+                self.connection.execute(f"RELEASE SAVEPOINT {savepoint}")
+            else:
+                self.connection.rollback()
             raise
 
     def write(self, table: str, mapping: dict[str, str], rows, conflict_columns=()):
@@ -270,7 +279,7 @@ class CodexLogImporter:
         if not self.transformations:
             raise ValueError("At least one transformation is required.")
 
-    def collect(self, roots: list[Path]) -> list[Diagnostic]:
+    def collect(self, roots: list[Path], strict_index: bool = False) -> list[Diagnostic]:
         """Collect each available source, returning read and write diagnostics."""
         diagnostics: list[Diagnostic] = []
         for path in self.reader.discover(roots, diagnostics):
@@ -280,10 +289,10 @@ class CodexLogImporter:
                     diagnostics.append(Diagnostic(str(path), None, warning))
             except (OSError, sqlite3.Error, ValueError) as exc:
                 diagnostics.append(Diagnostic(str(path), None, f"Cannot collect source: {exc}", fatal=True))
-        diagnostics.extend(self._collect_index())
+        diagnostics.extend(self._collect_index(strict_index))
         return diagnostics
 
-    def _collect_index(self):
+    def _collect_index(self, strict: bool = False):
         """Retain a readable snapshot of valid title evidence independently of logs."""
         from internal.analytics.token_accounting import _timestamp
 
@@ -292,7 +301,7 @@ class CodexLogImporter:
         except FileNotFoundError:
             return []
         except OSError as exc:
-            return [Diagnostic(str(self.index_path), None, f"Cannot read chat index: {exc}")]
+            return [Diagnostic(str(self.index_path), None, f"Cannot read chat index: {exc}", fatal=strict)]
         rows, diagnostics = [], []
         for number, line in enumerate(lines, 1):
             try:
@@ -309,7 +318,7 @@ class CodexLogImporter:
                 self.writer.connection.execute("DELETE FROM chat_title_evidence")
                 self.writer.connection.executemany("INSERT INTO chat_title_evidence (thread_id, title, updated_at) VALUES (?, ?, ?)", rows)
         except sqlite3.Error as exc:
-            diagnostics.append(Diagnostic(str(self.index_path), None, f"Cannot retain chat titles: {exc}"))
+            diagnostics.append(Diagnostic(str(self.index_path), None, f"Cannot retain chat titles: {exc}", fatal=strict))
         return diagnostics
 
     def _collect_source(self, path: Path) -> str | None:
@@ -400,6 +409,32 @@ class CodexLogImporter:
             return False, diagnostics
         success, rebuild_diagnostics = self.rebuild()
         return success, diagnostics + rebuild_diagnostics
+
+    def full_refresh(self, roots: list[Path]) -> tuple[bool, list[Diagnostic]]:
+        """Replace imported evidence and its publication in one transaction."""
+        connection = self.writer.connection
+        diagnostics = []
+        try:
+            with self.writer.transaction():
+                connection.execute("PRAGMA defer_foreign_keys = ON")
+                for table in ("published_logs", "usage_records", "coverage_diagnostics", "agent_threads",
+                              "chat_title_evidence", "source_paths", "collected_records", "logs", "import_state"):
+                    connection.execute(f"DELETE FROM {_identifier(table)}")
+                diagnostics = self.collect(roots, strict_index=True)
+                if any(item.fatal for item in diagnostics):
+                    raise ValueError("Source collection failed.")
+                if not connection.execute("SELECT EXISTS(SELECT 1 FROM collected_records)").fetchone()[0]:
+                    raise ValueError("No source records were available for full refresh.")
+                success, rebuild_diagnostics = self.rebuild()
+                diagnostics.extend(rebuild_diagnostics)
+                if not success:
+                    raise ValueError("Source publication failed.")
+            return True, diagnostics
+        except Exception as exc:
+            if not any(item.fatal for item in diagnostics):
+                diagnostics.append(Diagnostic(str(self.writer.database_path), None,
+                                              f"Cannot fully refresh usage: {exc}", fatal=True))
+            return False, diagnostics
 
     def rebuild(self) -> tuple[bool, list[Diagnostic]]:
         """Atomically publish transformations from a committed raw snapshot."""
