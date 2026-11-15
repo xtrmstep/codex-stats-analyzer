@@ -148,7 +148,8 @@ def render_statistics(calculator, selection, marker, project_keys, selected_agen
         for section, charts in sections:
             st.subheader(section)
             for title, group_key, series in charts:
-                st.markdown(f"##### {title}")
+                heading = f"By {series}" if title.endswith("over time") else title
+                st.markdown(f"##### {heading}")
                 ordered = sorted(groups[group_key], key=lambda item: _measurement_key(item, title))
                 rows = [_row(item, title) for item in ordered]
                 if not rows or not any(row["Total tokens"] is not None for row in rows):
