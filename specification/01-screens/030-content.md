@@ -99,6 +99,8 @@ The spec remains minimal until a later UI pass adds page-specific details.
 
 ## 3.4 Manual Annotations
 
-Show **Manual Annotations** as the page heading. List all saved time markers in a table with **Name** and **Local date and time** columns. Sort by timestamp from oldest to newest. Show **No saved time markers** when the list is empty.
+Show **Manual Annotations** as the page heading, with **Add new** above a table with **Name**, **Timestamp**, and **Actions** columns. List all saved markers from oldest to newest. Display each timestamp in the app's local time as `YYYY-MM-DD HH:MM:SS`. Show **No saved time markers** when the list is empty. Each row has **Edit** and **Delete** buttons. **Delete** removes that row's marker and refreshes the table.
 
-Place the marker controls below the list. Users can create, rename, edit, and delete markers. Use **Date** and **Time** pickers with the app's local time zone indicated. Default new markers to the current local date and time. For existing markers, show the saved instant in local time and preserve it on a name-only edit. Save changed times with the offset for the selected date and time. For a skipped or repeated local time, ask for a time that identifies one instant.
+Start with the form hidden. **Add new** opens a form below the table with a blank name and the current local date and time. **Edit** opens the same form with the selected marker's name and local date and time. Use **Date** and **Time** pickers and indicate the app's local time zone in the form. **Save** refreshes the table and closes the form on success. Keep the form open with the entered values and a message if validation fails.
+
+Preserve the saved instant on a name-only edit. Save changed times with the offset for the selected date and time. For a skipped or repeated local time, ask for a time that identifies one instant.
