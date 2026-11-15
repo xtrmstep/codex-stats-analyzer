@@ -1,6 +1,6 @@
 # Sidebar
 
-The sidebar provides navigation between Overview and Manual annotations and contains Overview configuration and filters.
+The sidebar provides navigation between **Overview** and **Manual Annotations** and contains Overview configuration and filters.
 
 ## 1.1 Sidebar sketch
 
@@ -9,7 +9,7 @@ The sidebar provides navigation between Overview and Manual annotations and cont
 | Navigation                                                     |
 |                                                               |
 |  1.1.1 Overview                                              |
-|  1.1.2 Manual annotations                                    |
+|  1.1.2 Manual Annotations                                    |
 |                                                               |
 | Overview configuration                                       |
 |   Date range, Time aggregation, Compare to previous period    |
@@ -26,9 +26,9 @@ The sketch is a simplified model for the app shell shown in [000-main-layout.md]
 
 This section presents the aggregated statistics for the selected time range and filters. It is the default landing view for high-level analysis.
 
-### 1.2.2 Manual annotations
+### 1.2.2 Manual Annotations
 
-This section allows users to create, edit, and delete named time markers and to set or clear a user-assigned name for each agent execution. Markers have a timestamp and apply across chats. Identify executions using chat titles and available roles or nicknames; distinguish duplicate labels without displaying IDs.
+Open the [Manual Annotations page](./030-content.md#34-manual-annotations) to view, create, edit, and delete saved time markers.
 
 ## 1.3 Navigation behavior
 
@@ -44,15 +44,14 @@ The current product scope is intentionally shallow. There are no run pages, no l
 
 The current scope does not confirm:
 
-- exact menu naming or iconography
+- navigation icons
 - whether the navigation is static or collapsible
-- whether the manual annotations mode is displayed as a dedicated page or a modal form
 
 These remain open for later UI specification work.
 
 ## 1.5 Filters
 
-On Overview, show one collapsible **Filters** section below [Overview configuration](#16-overview-configuration). Start it expanded. Collapsing it hides the controls and keeps their selections active. It contains project, model, observed agent role, chat, agent name, execution mode, and saved time marker selection. Manual annotations uses its own editor controls in the main content area.
+On Overview, show one collapsible **Filters** section below [Overview configuration](#16-overview-configuration). Start it expanded. Collapsing it hides the controls and keeps their selections active. It contains project, model, observed agent role, chat, agent name, execution mode, and saved time marker selection.
 
 - **Chat** lists distinct known titles available for the selected dates and other applicable filters. It defaults to **All chats** and returns to that value if the selected title becomes unavailable. A selected title includes the main agent and all subagents that have inherited that title from their verified root. If several chats share the same title, the option includes all of them. Usage from untitled chats remains available under **All chats**.
 - **Agent** lists distinct agent and subagent names and defaults to **All agents**. Use the [reporting name](./030-content.md#3222-trends-and-charts) for each execution. With **All chats**, a selected name matches executions across chats. A selected chat title narrows the available agent names and the results. Keep a selected agent name while it remains available and reset to **All agents** when it becomes unavailable. **Agent roles** filters by observed role and combines with both selections.

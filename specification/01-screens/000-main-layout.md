@@ -17,7 +17,7 @@ The application is organized into three primary regions:
 +------------------------------+-------------------------------------------------------+
 | [0.1] Sidebar                | [0.3] Main content                                    |
 |   - Navigation               |   - refresh actions, KPIs, and charts                 |
-|   - Overview configuration   |   - manual annotations editor                         |
+|   - Overview configuration   |   - Manual Annotations table and marker editor        |
 |   - Filters (collapsible)    |                                                       |
 +------------------------------+-------------------------------------------------------+
 ```
@@ -46,9 +46,8 @@ The main content region contains the currently selected page body. This includes
 
 The current scope does not confirm:
 
-- exact menu labels or icons
+- navigation icons
 - whether the left navigation is collapsible
 - whether the header includes search, actions, or status indicators
-- whether manual annotations uses a form, a modal, or a dedicated page layout
 
 These remain open for later UI specification work.

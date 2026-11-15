@@ -73,7 +73,7 @@ Use an empty state for a chart without plottable totals and retain the reporting
 
 #### Saved time markers
 
-Users can create, rename, edit, and delete named timestamps. Markers have no chat criterion, apply across chats, and persist across restarts and rebuilds.
+Manage saved time markers on the [Manual Annotations page](#34-manual-annotations). Markers apply across chats and persist across restarts and rebuilds.
 
 #### Reporting windows
 
@@ -94,6 +94,11 @@ Metrics and charts update according to the Overview date range, sidebar filters,
 This document intentionally does not define:
 
 - exact chart types where unspecified
-- a separate manual-annotations management surface
 
 The spec remains minimal until a later UI pass adds page-specific details.
+
+## 3.4 Manual Annotations
+
+Show **Manual Annotations** as the page heading. List all saved time markers in a table with **Name** and **Local date and time** columns. Sort by timestamp from oldest to newest. Show **No saved time markers** when the list is empty.
+
+Place the marker controls below the list. Users can create, rename, edit, and delete markers. Use **Date** and **Time** pickers with the app's local time zone indicated. Default new markers to the current local date and time. For existing markers, show the saved instant in local time and preserve it on a name-only edit. Save changed times with the offset for the selected date and time. For a skipped or repeated local time, ask for a time that identifies one instant.
