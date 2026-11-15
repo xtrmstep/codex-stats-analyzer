@@ -110,10 +110,10 @@ def _render(sources, writer, page):
         start, end = limits[preset]
         bucket = st.radio("Time aggregation", ["hourly", "daily", "weekly", "monthly"], index=1, horizontal=True)
         compare = st.checkbox("Compare to previous period", value=False, disabled=start is None)
+        compare = compare and start is not None and end is not None
+        marker = marker_selector(writer, disabled=compare)
 
     filters = st.sidebar.expander("Filters", expanded=True)
-    with filters:
-        marker = marker_selector(writer)
 
     reader = CodexLogReader()
     importer = CodexLogImporter(reader, writer)
@@ -186,7 +186,7 @@ def _render(sources, writer, page):
         chosen_pairs = {(row["session_id"], row["thread_id"]) for row in chosen_threads}
         selected = selected.loc[[pair in chosen_pairs for pair in zip(selected["session"], selected["agent"])]].copy()
     render_statistics(
-        report_calculator, selection, marker, project_keys, selected_agents, bucket,
+        report_calculator, selection, None if compare else marker, project_keys, selected_agents, bucket,
         comparison_bounds=_previous_period(start, end) if compare and start is not None else None,
         comparison_agents=(_comparison_execution_ids(report_calculator.threads, selected_chat, selected_agent)
                            if compare and start is not None else None),

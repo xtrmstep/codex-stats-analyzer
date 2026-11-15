@@ -12,12 +12,15 @@ import streamlit as st
 from internal.analytics.usage_statistics import StatsRequest, delete_marker, list_markers, save_marker
 
 
-def marker_selector(writer):
+def marker_selector(writer, disabled=False):
     """Select an existing marker for the Overview report."""
     markers = list_markers(writer.connection)
     by_id = {marker.marker_id: marker for marker in markers}
+    if st.session_state.get("overview_marker", "None") not in by_id:
+        st.session_state["overview_marker"] = "None"
     choice = st.selectbox("Saved time marker", ["None"] + list(by_id),
-                          format_func=lambda key: by_id[key].name if key in by_id else key)
+                          format_func=lambda key: by_id[key].name if key in by_id else key,
+                          key="overview_marker", disabled=disabled)
     return by_id.get(choice)
 
 
