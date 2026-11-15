@@ -1,6 +1,7 @@
 """Streamlit controls and tables for committed usage measurements."""
 
 from datetime import datetime
+from textwrap import wrap
 
 import pandas as pd
 import plotly.express as px
@@ -147,7 +148,7 @@ def render_statistics(calculator, selection, marker, project_keys, selected_agen
         for section, charts in sections:
             st.subheader(section)
             for title, group_key, series in charts:
-                st.markdown(f"#### {title}")
+                st.markdown(f"##### {title}")
                 ordered = sorted(groups[group_key], key=lambda item: _measurement_key(item, title))
                 rows = [_row(item, title) for item in ordered]
                 if not rows or not any(row["Total tokens"] is not None for row in rows):
@@ -161,6 +162,7 @@ def render_statistics(calculator, selection, marker, project_keys, selected_agen
                 if title == "Agent by project over time":
                     chart["Project"] = chart["Project"].fillna("Unknown")
                     kwargs["facet_col"] = "Project"
+                    kwargs["facet_col_spacing"] = min(0.10, 0.5 / max(chart["Project"].nunique() - 1, 1))
                 if trend and chart["Time"].isna().any():
                     chart["Time"] = chart["Time"].fillna("Unknown")
                     kwargs["category_orders"] = {"Time": list(dict.fromkeys(chart["Time"]))}
@@ -169,4 +171,23 @@ def render_statistics(calculator, selection, marker, project_keys, selected_agen
                 figure = px.bar(chart, x=x, y="Total tokens", color=series, hover_data=["Coverage"], **kwargs)
                 if trend and "category_orders" in kwargs:
                     figure.update_xaxes(type="category")
+                top_margin = 20
+                height = 300 if trend else 260
+                if title == "Agent by project over time":
+                    lines = [wrap(annotation.text, width=18, break_on_hyphens=False) or [""]
+                             for annotation in figure.layout.annotations]
+                    for annotation, parts in zip(figure.layout.annotations, lines):
+                        annotation.text = "<br>".join(parts)
+                    top_margin = max(40, 18 * max((len(parts) for parts in lines), default=1))
+                    height = max(340, 280 + top_margin)
+                elif not trend and chart[x].astype(str).str.len().max() > 24:
+                    height = 310
+                figure.update_layout(height=height, margin=dict(l=20, r=20, t=top_margin, b=35))
+                figure.update_xaxes(automargin=True)
+                figure.update_yaxes(automargin=True)
+                if title == "Agent by project over time":
+                    figure.update_xaxes(nticks=2, tickangle=0)
+                    if "category_orders" not in kwargs:
+                        tick_format = "%b %d\n%H:%M" if bucket == "hourly" else "%b %Y" if bucket == "monthly" else "%b %d"
+                        figure.update_xaxes(tickformat=tick_format)
                 st.plotly_chart(figure, use_container_width=True, key=f"usage_{scope_index}_{group_key}")
